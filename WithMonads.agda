@@ -39,7 +39,7 @@ data Type : Set where
   _⇛_ : (τ₁ τ₂ : Type) → Type
 
 data Judgement : Set where
-  _∷_ : (t : Term) → (τ : Type) → Judgement
+  _∷_ : (x : V) → (τ : Type) → Judgement
 
 data Context : Set where
   ∅ : Context
@@ -50,19 +50,20 @@ infix  50 _∷_
 infixr 60 _↦_
 infixr 60 _⇛_
 infixl 65 _$_
+infixr 65 _>>=_
 
 data _⊢_∷_ : (Γ : Context) → (t : Term) → (τ : Type) → Set where
-  ass : {Γ : Context} {t : Term} {α : Type} → 
-        Γ ▹ t ∷ α ⊢ t ∷ α
+  ass : {Γ : Context} {t : V} {α : Type} → 
+        Γ ▹ t ∷ α ⊢ var t ∷ α
 
-  abs : {Γ : Context} {t : Term}{x : V}{α β : Type} → 
-        Γ ▹ (var x) ∷ α ⊢ t ∷ β  →  Γ ⊢ x ↦ t ∷ α ⇛ β
+  abs : {Γ : Context} {t : Term} {x : V} {α β : Type} → 
+        Γ ▹ x ∷ α ⊢ t ∷ β  →  Γ ⊢ x ↦ t ∷ α ⇛ β
 
-  app : {Γ : Context} {m n : Term}{α β : Type} → 
+  app : {Γ : Context} {m n : Term} (α : Type) {β : Type} → 
         Γ ⊢ m ∷ α ⇛ β  →  Γ ⊢ n ∷ α  →  Γ ⊢ m $ n ∷ β
 
-  weak : {Γ : Context} {t t' : Term}{α β : Type} → 
-        Γ ⊢ t ∷ β  →  Γ ▹ t' ∷ α ⊢ t ∷ β
+  weak : {Γ : Context} {t : Term} {x : V} {α β : Type} → 
+        Γ ⊢ t ∷ β  →  Γ ▹ x ∷ α ⊢ t ∷ β
 
   refl : {Γ : Context} {t : Term} {α : Type} → 
         Γ ⊢ t ∷ T α  →  Γ ⊢ μ t ∷ α
@@ -96,7 +97,7 @@ data MType : Set where
   _⇛_ : (τ₁ τ₂ : MType) → MType
 
 data MJudgement : Set where
-  _∷_ : (t : MTerm) → (τ : MType) → MJudgement
+  _∷_ : (x : V) → (τ : MType) → MJudgement
 
 data MContext : Set where
   ∅ : MContext
@@ -111,17 +112,17 @@ infixl 65 _$_
 -}
 
 data _⊢T_∷_ : (Γ : MContext) → (t : MTerm) → (τ : MType) → Set where
-  ass : {Γ : MContext} {t : MTerm} {α : MType} → 
-        Γ ▹ t ∷ α ⊢T t ∷ α
+  ass : {Γ : MContext} {x : V} {α : MType} → 
+        Γ ▹ x ∷ α ⊢T var x ∷ α
 
   abs : {Γ : MContext} {t : MTerm} {x : V} {α β : MType} → 
-        Γ ▹ (var x) ∷ α ⊢T t ∷ β  →  Γ ⊢T x ↦ t ∷ α ⇛ β
+        Γ ▹ x ∷ α ⊢T t ∷ β  →  Γ ⊢T x ↦ t ∷ α ⇛ β
 
   app : {Γ : MContext} {m n : MTerm} {α β : MType} → 
         Γ ⊢T m ∷ α ⇛ β  →  Γ ⊢T n ∷ α  →  Γ ⊢T m $ n ∷ β
 
-  weak : {Γ : MContext} {t t' : MTerm} {α β : MType} → 
-        Γ ⊢T t ∷ β  →  Γ ▹ t' ∷ α ⊢T t ∷ β
+  weak : {Γ : MContext} {t : MTerm} {x : V} {α β : MType} → 
+        Γ ⊢T t ∷ β  →  Γ ▹ x ∷ α ⊢T t ∷ β
 
   ret  : {Γ : MContext} {t : MTerm} {α : MType} → 
         Γ ⊢T t ∷ α  →  Γ ⊢T return t ∷ T α
@@ -135,9 +136,6 @@ data MHasType : MTerm → MType → Set where
 
 
 {- Translations into monadic style and CPS -}
-
--- do we need functions like 
--- Context → MContext ?
 
 f : V
 f = 0
@@ -167,15 +165,44 @@ x = 1
 
 ⟦_⟧ΓM : Context → MContext
 ⟦ ∅ ⟧ΓM = ∅
-⟦ Γ ▹ t ∷ τ ⟧ΓM = {!⟦ Γ ⟧ΓM ▹ t ∷ ⟦ τ ⟧τM !}
+⟦ Γ ▹ x ∷ τ ⟧ΓM = ⟦ Γ ⟧ΓM ▹ x ∷ ⟦ τ ⟧τM 
+
+-- the relation before the types before and after the translation
+-- the proof was generated automatically after manually matching first on τ then on the derivation
+
+monad-validness : ∀ Γ t τ   →   Γ ⊢ t ∷ τ   →   ⟦ Γ ⟧ΓM ⊢T ⟦ t ⟧M ∷ T ⟦ τ ⟧τM
+monad-validness .(Γ ▹ t ∷ γ) .(var t) γ (ass {Γ} {t}) = ret ass
+monad-validness Γ .(m $ n) γ (app {.Γ} {m} {n} α y y') = bind (monad-validness Γ m (α ⇛ γ) y)
+                                                           (abs
+                                                            (bind (weak (monad-validness Γ n α y'))
+                                                             (abs (app (weak ass) ass))))
+monad-validness .(Γ ▹ x ∷ α) t γ (weak {Γ} {.t} {x} {α} y) = weak (monad-validness Γ t γ y)
+monad-validness Γ .(μ t) γ (refl {.Γ} {t} y) = bind (monad-validness Γ t (T γ) y) (abs ass)
+monad-validness .(Γ ▹ t ∷ T τ) .(var t) (T τ) (ass {Γ} {t}) = ret ass
+monad-validness Γ .(m $ n) (T τ) (app {.Γ} {m} {n} α y y') = bind (monad-validness Γ m (α ⇛ T τ) y)
+                                                               (abs
+                                                                (bind (weak (monad-validness Γ n α y'))
+                                                                 (abs (app (weak ass) ass))))
+monad-validness .(Γ ▹ x ∷ α) t (T τ) (weak {Γ} {.t} {x} {α} y) = weak (monad-validness Γ t (T τ) y)
+monad-validness Γ .(μ t) (T τ) (refl {.Γ} {t} y) = bind (monad-validness Γ t (T (T τ)) y) (abs ass)
+monad-validness Γ .([ t ]) (T τ) (reif {.Γ} {t} y) = ret (monad-validness Γ t τ y)
+monad-validness .(Γ ▹ t ∷ τ₁ ⇛ τ₂) .(var t) (τ₁ ⇛ τ₂) (ass {Γ} {t}) = ret ass
+monad-validness Γ .(x ↦ t) (τ₁ ⇛ τ₂) (abs {.Γ} {t} {x} y) = ret (abs (monad-validness (Γ ▹ x ∷ τ₁) t τ₂ y))
+monad-validness Γ .(m $ n) (τ₁ ⇛ τ₂) (app {.Γ} {m} {n} α y y') = bind (monad-validness Γ m (α ⇛ τ₁ ⇛ τ₂) y)
+                                                                   (abs
+                                                                    (bind (weak (monad-validness Γ n α y'))
+                                                                     (abs (app (weak ass) ass))))
+monad-validness .(Γ ▹ x ∷ α) t (τ₁ ⇛ τ₂) (weak {Γ} {.t} {x} {α} y) = weak (monad-validness Γ t (τ₁ ⇛ τ₂) y)
+monad-validness Γ .(μ t) (τ₁ ⇛ τ₂) (refl {.Γ} {t} y) = bind (monad-validness Γ t (T (τ₁ ⇛ τ₂)) y) (abs ass)
+
 
 {- Example judgments with derivations -}
 
 id : ∅ ⊢ t-id ∷ γ ⇛ γ
 id = abs ass
 
-id-x : ∅ ▹ var zero ∷ γ ⊢ t-id $ var zero ∷ γ
-id-x = app (abs ass) ass
+id-x : ∅ ▹ zero ∷ γ ⊢ t-id $ var zero ∷ γ
+id-x = app γ (abs ass) ass
 
 {-
 ex-id : ∀ {x τ} → Program (x ↦ var x) (τ ⇛ τ)
