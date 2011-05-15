@@ -6,7 +6,7 @@ module WithMonads where
 -}
 
 open import Data.Nat
-
+open import Data.Product
 
 -- set of variables
 V : Set
@@ -130,7 +130,7 @@ data _⊢T_∷_ : (Γ : MContext) → (t : MTerm) → (τ : MType) → Set where
   ⟶ο  : {Γ : MContext} {t : MTerm} {α : MType} → 
         Γ ⊢T t ∷ α  →  Γ ⊢T ο↑ t ∷ ο 
 
-  ⟵ο  : {Γ : MContext} {t : MTerm} {α : MType} → 
+  ο⟶  : {Γ : MContext} {t : MTerm} {α : MType} → 
         Γ ⊢T t ∷ ο  →  Γ ⊢T ο↓ t ∷ α 
 
 data MHasType : MTerm → MType → Set where
@@ -148,11 +148,11 @@ x = 1
 -- we start by ignoring types
 
 ⟦_⟧M : Term → MTerm
-⟦ (var v) ⟧M = return (var v)
-⟦ (v ↦ e) ⟧M = return (v ↦ ⟦ e ⟧M )
-⟦ (m $ n) ⟧M = ⟦ m ⟧M >>= (f ↦ ⟦ n ⟧M >>= (x ↦ var f $ var x))
-⟦ [ t ]   ⟧M = return ⟦ t ⟧M 
-⟦ (μ t)   ⟧M = ⟦ t ⟧M >>= (x ↦ var x)
+⟦ var v ⟧M = return (var v)
+⟦ v ↦ e ⟧M = return (v ↦ ⟦ e ⟧M )
+⟦ m $ n ⟧M = ⟦ m ⟧M >>= (f ↦ ⟦ n ⟧M >>= (x ↦ var f $ var x))
+⟦ [ t ] ⟧M = return ⟦ t ⟧M 
+⟦ μ t   ⟧M = ⟦ t ⟧M >>= (x ↦ var x)
 
 {- Now we do it with types -}
 
@@ -246,6 +246,54 @@ cps-validness Γ (v ↦ e) .(α ⇛ β) (abs {.Γ} {.e} {.v} {α} {β} y) = abs 
 cps-validness .(Γ ▹ x ∷ α) (v ↦ e) τ (weak {Γ} {.(v ↦ e)} {x} {α} y) = weak (cps-validness Γ (v ↦ e) τ y)
 cps-validness .(Γ ▹ x ∷ α) [ t ] τ (weak {Γ} {.([ t ])} {x} {α} y) = weak (cps-validness Γ [ t ] τ y)
 cps-validness Γ [ t ] .(T α) (reif {.Γ} {.t} {α} y) 
- = abs (app ass (app (abs (bind ass (abs (ret (⟵ο ass))))) (app (weak (cps-validness Γ t α y)) (abs (ret (⟶ο ass))))))
+ = abs (app ass (app (abs (bind ass (abs (ret (ο⟶ ass))))) (app (weak (cps-validness Γ t α y)) (abs (ret (⟶ο ass))))))
 cps-validness .(Γ ▹ x ∷ α) (μ t) τ (weak {Γ} {.(μ t)} {x} {α} y) = weak (cps-validness Γ (μ t) τ y)
 cps-validness Γ (μ t) τ (refl y) = abs (app (weak (cps-validness Γ t (T τ) y)) (abs (bind ass (weak ass))))
+
+
+
+{-
+  Having defined the translations to both monadic and continuation-passing style,
+  the next step is to define and prove the relationship between the two styles.
+-}
+
+{- 
+  The φ and ψ retractions
+
+  φ[ α ] : ⟦ α ⟧τM → ⟦ α ⟧τK
+  ψ[ α ] : ⟦ α ⟧τK → ⟦ α ⟧τM
+-}
+
+{- 
+  Weak specification 
+-}
+
+-- implementation
+
+mutual
+  φ⟨_⟩ : (α : Type) → (tM : MTerm) → MTerm
+  φ⟨ α ⟩ = {!!}
+
+  ψ⟨_⟩ : (α : Type) → (tK : MTerm) → MTerm
+  ψ⟨ α ⟩ = {!!}
+
+-- Type-wise correctness of the implementation
+
+mutual
+  φ-cor : (α : Type) (tM : MTerm) →   ∅ ⊢T tM ∷ ⟦ α ⟧τM   →  ∅ ⊢T (φ⟨ α ⟩ tM) ∷ ⟦ α ⟧τK
+  φ-cor = {!!}
+
+  ψ-cor : (α : Type) (tK : MTerm) →   ∅ ⊢T tK ∷ ⟦ α ⟧τK   →  ∅ ⊢T (ψ⟨ α ⟩ tK) ∷ ⟦ α ⟧τM
+  ψ-cor = {!!}
+
+
+{- 
+  Strong specification 
+-}
+
+mutual
+  φ[_] : (α : Type) (tM : MTerm) →   ∅ ⊢T tM ∷ ⟦ α ⟧τM   →  Σ[ tK ∶ MTerm ]  ∅ ⊢T tK ∷ ⟦ α ⟧τK
+  φ[ α ] = {!!}
+
+  ψ[_] : (α : Type) (tK : MTerm) →   ∅ ⊢T tK ∷ ⟦ α ⟧τK   →  Σ[ tM ∶ MTerm ]  ∅ ⊢T tM ∷ ⟦ α ⟧τM
+  ψ[ α ] = {!!}
