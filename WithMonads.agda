@@ -311,13 +311,13 @@ mutual
 
 {- 
   Strong specification 
--}
-
-{- We postpone the implementation of this part. -}
+  
+  We don't have to construct it from scratch, it sufficess to packages the φ function and φ-cor proof
+  together. -}
 
 mutual
-  φ[_] : (α : Type) (tM : MTerm) →   ∅ ⊢T tM ∷ ⟦ α ⟧τM   →  Σ[ tK ∶ MTerm ]  ∅ ⊢T tK ∷ ⟦ α ⟧τK
-  φ[ α ] = {!!}
+  φ[_] : (α : Type) (Γ : MContext) (tM : MTerm) →   Γ ⊢T tM ∷ ⟦ α ⟧τM   →  Σ[ tK ∶ MTerm ]  Γ ⊢T tK ∷ ⟦ α ⟧τK
+  φ[ α ] Γ tM der = φ⟨ α ⟩ tM , φ-cor Γ α tM der
 
-  ψ[_] : (α : Type) (tK : MTerm) →   ∅ ⊢T tK ∷ ⟦ α ⟧τK   →  Σ[ tM ∶ MTerm ]  ∅ ⊢T tM ∷ ⟦ α ⟧τM
-  ψ[ α ] = {!!}
+  ψ[_] : (α : Type) (Γ : MContext) (tK : MTerm) →   Γ ⊢T tK ∷ ⟦ α ⟧τK   →  Σ[ tM ∶ MTerm ]  Γ ⊢T tM ∷ ⟦ α ⟧τM
+  ψ[ α ] Γ tM der = ψ⟨ α ⟩ tM , ψ-cor Γ α tM der
