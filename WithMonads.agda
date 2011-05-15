@@ -36,7 +36,7 @@ t-app-id = t-id $ t-id
 data Type : Set where
   γ   : Type
   T   : (τ : Type) → Type
-  _⇛_ : (τ₁ τ₂ : Type) → Type
+  _⇒_ : (τ₁ τ₂ : Type) → Type
 
 data Judgement : Set where
   _∷_ : (x : V) → (τ : Type) → Judgement
@@ -48,7 +48,7 @@ data Context : Set where
 infixl 40 _▹_
 infix  50 _∷_
 infixr 60 _↦_
-infixr 60 _⇛_
+infixr 60 _⇒_
 infixl 65 _$_
 infixr 65 _>>=_
 
@@ -57,10 +57,10 @@ data _⊢_∷_ : (Γ : Context) → (t : Term) → (τ : Type) → Set where
         Γ ▹ t ∷ α ⊢ var t ∷ α
 
   abs : {Γ : Context} {t : Term} {x : V} {α β : Type} → 
-        Γ ▹ x ∷ α ⊢ t ∷ β  →  Γ ⊢ x ↦ t ∷ α ⇛ β
+        Γ ▹ x ∷ α ⊢ t ∷ β  →  Γ ⊢ x ↦ t ∷ α ⇒ β
 
   app : {Γ : Context} {m n : Term} (α : Type) {β : Type} → 
-        Γ ⊢ m ∷ α ⇛ β  →  Γ ⊢ n ∷ α  →  Γ ⊢ m $ n ∷ β
+        Γ ⊢ m ∷ α ⇒ β  →  Γ ⊢ n ∷ α  →  Γ ⊢ m $ n ∷ β
 
   weak : {Γ : Context} {t : Term} {x : V} {α β : Type} → 
         Γ ⊢ t ∷ β  →  Γ ▹ x ∷ α ⊢ t ∷ β
@@ -85,7 +85,7 @@ data MType : Set where
   ο   : MType 
   γ   : MType
   T   : (τ : MType) → MType
-  _⇛_ : (τ₁ τ₂ : MType) → MType
+  _⇒_ : (τ₁ τ₂ : MType) → MType
 
 data MTerm : Set where
   var : (v : V) → MTerm
@@ -113,10 +113,10 @@ data _⊢T_∷_ : (Γ : MContext) → (t : MTerm) → (τ : MType) → Set where
         Γ ▹ x ∷ α ⊢T var x ∷ α
 
   abs : {Γ : MContext} {t : MTerm} {x : V} {α β : MType} → 
-        Γ ▹ x ∷ α ⊢T t ∷ β  →  Γ ⊢T x ↦ t ∷ α ⇛ β
+        Γ ▹ x ∷ α ⊢T t ∷ β  →  Γ ⊢T x ↦ t ∷ α ⇒ β
 
   app : {Γ : MContext} {m n : MTerm} {α : MType} {β : MType} → 
-        Γ ⊢T m ∷ α ⇛ β  →  Γ ⊢T n ∷ α  →  Γ ⊢T m $ n ∷ β
+        Γ ⊢T m ∷ α ⇒ β  →  Γ ⊢T n ∷ α  →  Γ ⊢T m $ n ∷ β
 
   weak : {Γ : MContext} {t : MTerm} {x : V} {α β : MType} → 
         Γ ⊢T t ∷ β  →  Γ ▹ x ∷ α ⊢T t ∷ β
@@ -125,7 +125,7 @@ data _⊢T_∷_ : (Γ : MContext) → (t : MTerm) → (τ : MType) → Set where
         Γ ⊢T t ∷ α  →  Γ ⊢T return t ∷ T α
 
   bind : {Γ : MContext} {m f : MTerm} {α β : MType} → 
-        Γ ⊢T m ∷ T α  →  Γ ⊢T f ∷ α ⇛ T β  →  Γ ⊢T m >>= f ∷ T β
+        Γ ⊢T m ∷ T α  →  Γ ⊢T f ∷ α ⇒ T β  →  Γ ⊢T m >>= f ∷ T β
 
   ⟶ο  : {Γ : MContext} {t : MTerm} {α : MType} → 
         Γ ⊢T t ∷ α  →  Γ ⊢T ο↑ t ∷ ο 
@@ -161,7 +161,7 @@ x = 1
 ⟦_⟧τM : Type → MType
 ⟦ γ ⟧τM       = γ
 ⟦ T τ ⟧τM     = T ⟦ τ ⟧τM
-⟦ τ₁ ⇛ τ₂ ⟧τM = ⟦ τ₁ ⟧τM ⇛ T ⟦ τ₂ ⟧τM
+⟦ τ₁ ⇒ τ₂ ⟧τM = ⟦ τ₁ ⟧τM ⇒ T ⟦ τ₂ ⟧τM
 
 -- mapping type translation in the context
 
@@ -175,12 +175,12 @@ x = 1
 monad-validness : ∀ Γ t τ   →   Γ ⊢ t ∷ τ   →   ⟦ Γ ⟧ΓM ⊢T ⟦ t ⟧M ∷ T ⟦ τ ⟧τM
 monad-validness .(Γ ▹ v ∷ τ) (var v) τ (ass {Γ}) = ret ass
 monad-validness .(Γ ▹ x ∷ α) (var v) τ (weak {Γ} {.(var v)} {x} {α} y) = weak (monad-validness Γ (var v) τ y)
-monad-validness Γ (m $ n) τ (app α y y') = bind (monad-validness Γ m (α ⇛ τ) y)
+monad-validness Γ (m $ n) τ (app α y y') = bind (monad-validness Γ m (α ⇒ τ) y)
                                              (abs
                                               (bind (weak (monad-validness Γ n α y'))
                                                (abs (app (weak ass) ass))))
 monad-validness .(Γ ▹ x ∷ α) (m $ n) τ (weak {Γ} {.(m $ n)} {x} {α} y) = weak (monad-validness Γ (m $ n) τ y)
-monad-validness Γ (v ↦ e) .(α ⇛ β) (abs {.Γ} {.e} {.v} {α} {β} y) = ret (abs (monad-validness (Γ ▹ v ∷ α) e β y))
+monad-validness Γ (v ↦ e) .(α ⇒ β) (abs {.Γ} {.e} {.v} {α} {β} y) = ret (abs (monad-validness (Γ ▹ v ∷ α) e β y))
 monad-validness .(Γ ▹ x ∷ α) (v ↦ e) τ (weak {Γ} {.(v ↦ e)} {x} {α} y) = weak (monad-validness Γ (v ↦ e) τ y)
 monad-validness .(Γ ▹ x ∷ α) [ t ] τ (weak {Γ} {.([ t ])} {x} {α} y) = weak (monad-validness Γ [ t ] τ y)
 monad-validness Γ [ t ] .(T α) (reif {.Γ} {.t} {α} y) = ret (monad-validness Γ t α y)
@@ -218,12 +218,12 @@ m = 3
 -- type translation
 
 K : MType → MType
-K τ = (τ ⇛ T ο) ⇛ T ο
+K τ = (τ ⇒ T ο) ⇒ T ο
 
 ⟦_⟧τK : Type → MType
 ⟦ γ ⟧τK = γ
 ⟦ T τ ⟧τK = T ⟦ τ ⟧τK
-⟦ τ₁ ⇛ τ₂ ⟧τK = ⟦ τ₁ ⟧τK ⇛ K ⟦ τ₂ ⟧τK
+⟦ τ₁ ⇒ τ₂ ⟧τK = ⟦ τ₁ ⟧τK ⇒ K ⟦ τ₂ ⟧τK
 
 -- context translation
 
@@ -238,11 +238,11 @@ cps-validness : ∀ Γ t τ   →   Γ ⊢ t ∷ τ   →   ⟦ Γ ⟧ΓK ⊢T �
 cps-validness .(Γ ▹ v ∷ τ) (var v) τ (ass {Γ}) = abs (app ass (weak ass))
 cps-validness .(Γ ▹ x ∷ α) (var v) τ (weak {Γ} {.(var v)} {x} {α} y) = weak (cps-validness Γ (var v) τ y)
 cps-validness Γ (m $ n) τ (app α y y') 
-  = abs (app (weak (cps-validness Γ m (α ⇛ τ) y))
+  = abs (app (weak (cps-validness Γ m (α ⇒ τ) y))
     (abs (app (weak (weak (cps-validness Γ n α y'))) 
      (abs (app (app (weak ass) ass) (weak (weak ass)))))))
 cps-validness .(Γ ▹ x ∷ α) (m $ n) τ (weak {Γ} {.(m $ n)} {x} {α} y) = weak (cps-validness Γ (m $ n) τ y)
-cps-validness Γ (v ↦ e) .(α ⇛ β) (abs {.Γ} {.e} {.v} {α} {β} y) = abs (app ass (weak (abs (cps-validness (Γ ▹ v ∷ α) e β y))))
+cps-validness Γ (v ↦ e) .(α ⇒ β) (abs {.Γ} {.e} {.v} {α} {β} y) = abs (app ass (weak (abs (cps-validness (Γ ▹ v ∷ α) e β y))))
 cps-validness .(Γ ▹ x ∷ α) (v ↦ e) τ (weak {Γ} {.(v ↦ e)} {x} {α} y) = weak (cps-validness Γ (v ↦ e) τ y)
 cps-validness .(Γ ▹ x ∷ α) [ t ] τ (weak {Γ} {.([ t ])} {x} {α} y) = weak (cps-validness Γ [ t ] τ y)
 cps-validness Γ [ t ] .(T α) (reif {.Γ} {.t} {α} y) 
@@ -274,12 +274,12 @@ mutual
   φ⟨_⟩ : (α : Type) → (tM : MTerm) → MTerm
   φ⟨_⟩ γ t = t
   φ⟨_⟩ (T α) t = t >>= (x ↦ return (φ⟨ α ⟩ (var x))) -- ≡ fmap φ τ
-  φ⟨_⟩ (α ⇛ β) t = {!!}
+  φ⟨_⟩ (α ⇒ β) t = {!!}
 
   ψ⟨_⟩ : (α : Type) → (tK : MTerm) → MTerm
   ψ⟨_⟩ γ t = t
   ψ⟨_⟩ (T α) t = t >>= (x ↦ return (ψ⟨ α ⟩ (var x))) -- ≡ fmap ψ τ
-  ψ⟨_⟩ (α ⇛ β) t = {!!}
+  ψ⟨_⟩ (α ⇒ β) t = {!!}
 
 -- Type-wise correctness of the implementation
 
@@ -290,12 +290,12 @@ mutual
   φ-cor : (α : Type) (tM : MTerm) →   ∅ ⊢T tM ∷ ⟦ α ⟧τM   →  ∅ ⊢T (φ⟨ α ⟩ tM) ∷ ⟦ α ⟧τK
   φ-cor γ tM der = der
   φ-cor (T α) tM der = bind der (abs (ret {!!}))
-  φ-cor (α ⇛ β) tM der = {!!}
+  φ-cor (α ⇒ β) tM der = {!!}
 
   ψ-cor : (α : Type) (tK : MTerm) →   ∅ ⊢T tK ∷ ⟦ α ⟧τK   →  ∅ ⊢T (ψ⟨ α ⟩ tK) ∷ ⟦ α ⟧τM
   ψ-cor γ tK der = der
   ψ-cor (T α) tK der = {!!}
-  ψ-cor (α ⇛ β) tK der = {!!}
+  ψ-cor (α ⇒ β) tK der = {!!}
 
 
 {- 
@@ -308,3 +308,4 @@ mutual
 
   ψ[_] : (α : Type) (tK : MTerm) →   ∅ ⊢T tK ∷ ⟦ α ⟧τK   →  Σ[ tM ∶ MTerm ]  ∅ ⊢T tM ∷ ⟦ α ⟧τM
   ψ[ α ] = {!!}
+
