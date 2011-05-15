@@ -272,19 +272,30 @@ cps-validness Γ (μ t) τ (refl y) = abs (app (weak (cps-validness Γ t (T τ) 
 
 mutual
   φ⟨_⟩ : (α : Type) → (tM : MTerm) → MTerm
-  φ⟨ α ⟩ = {!!}
+  φ⟨_⟩ γ t = t
+  φ⟨_⟩ (T α) t = t >>= (x ↦ return (φ⟨ α ⟩ (var x))) -- ≡ fmap φ τ
+  φ⟨_⟩ (α ⇛ β) t = {!!}
 
   ψ⟨_⟩ : (α : Type) → (tK : MTerm) → MTerm
-  ψ⟨ α ⟩ = {!!}
+  ψ⟨_⟩ γ t = t
+  ψ⟨_⟩ (T α) t = t >>= (x ↦ return (ψ⟨ α ⟩ (var x))) -- ≡ fmap ψ τ
+  ψ⟨_⟩ (α ⇛ β) t = {!!}
 
 -- Type-wise correctness of the implementation
 
+{- We have a problem, because having only assertion of the form ∅ ⊢T ... is too restricting
+   To type abstractions we need to quantify over contexts... -}
+
 mutual
   φ-cor : (α : Type) (tM : MTerm) →   ∅ ⊢T tM ∷ ⟦ α ⟧τM   →  ∅ ⊢T (φ⟨ α ⟩ tM) ∷ ⟦ α ⟧τK
-  φ-cor = {!!}
+  φ-cor γ tM der = der
+  φ-cor (T α) tM der = bind der (abs (ret {!!}))
+  φ-cor (α ⇛ β) tM der = {!!}
 
   ψ-cor : (α : Type) (tK : MTerm) →   ∅ ⊢T tK ∷ ⟦ α ⟧τK   →  ∅ ⊢T (ψ⟨ α ⟩ tK) ∷ ⟦ α ⟧τM
-  ψ-cor = {!!}
+  ψ-cor γ tK der = der
+  ψ-cor (T α) tK der = {!!}
+  ψ-cor (α ⇛ β) tK der = {!!}
 
 
 {- 
