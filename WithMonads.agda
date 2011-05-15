@@ -138,15 +138,15 @@ data MHasType : MTerm → MType → Set where
 
 
 {- Translation into monadic style -}
-
-f : V
+ 
 f = 0
-
-x : V
 x = 1
-
-y : V
+k = 2
+m = 3
 y = 4
+a = 6
+b = 7
+
 
 -- we start by ignoring types
 
@@ -192,12 +192,6 @@ monad-validness Γ (μ t) τ (refl y) = bind (monad-validness Γ t (T τ) y) (ab
 
 
 {- Translation to CPS -}
-
-k : V
-k = 2
-
-m : V
-m = 3
 
 -- bare terms
 
@@ -265,6 +259,8 @@ cps-validness Γ (μ t) τ (refl y) = abs (app (weak (cps-validness Γ t (T τ) 
 
   φ[ α ] : ⟦ α ⟧τM → ⟦ α ⟧τK
   ψ[ α ] : ⟦ α ⟧τK → ⟦ α ⟧τM
+
+  We want ψ ∘ φ ≡βη id
 -}
 
 {- 
@@ -272,12 +268,6 @@ cps-validness Γ (μ t) τ (refl y) = abs (app (weak (cps-validness Γ t (T τ) 
 -}
 
 -- implementation
-
-a : ℕ
-a = 6
-
-b : ℕ
-b = 7
 
 mutual
   φ⟨_⟩ : (α : Type) → (tM : MTerm) → MTerm
@@ -290,30 +280,32 @@ mutual
   ψ⟨_⟩ (T α) t = t >>= (x ↦ return (ψ⟨ α ⟩ (var x))) -- ≡ fmap ψ τ
   ψ⟨_⟩ (α ⇒ β) t = a ↦ (m ↦ var m >>= (x ↦ return (ο↓ (var x)))) $ (t $ φ⟨ α ⟩ (var a) $ (b ↦ return (ο↑ (ψ⟨ β ⟩ (var b)))))
 
+
 -- Type-wise correctness of the implementation
 
 mutual
   φ-cor : (Γ : MContext) (α : Type) (tM : MTerm) →   Γ ⊢T tM ∷ ⟦ α ⟧τM   →  Γ ⊢T (φ⟨ α ⟩ tM) ∷ ⟦ α ⟧τK
   φ-cor Γ γ tMm der = der
   φ-cor Γ (T τ) tMm der = bind der
-                            (abs (ret (φ-cor (Γ ▹ suc zero ∷ ⟦ τ ⟧τM) τ (var (suc zero)) ass)))
-  φ-cor Γ (α ⇒ β) tMm der = abs (abs (bind (app (weak (weak der)) (weak (ψ-cor (Γ ▹ suc zero ∷ ⟦ α ⟧τK) α (var 1) ass))) 
-                           (abs (app (weak ass) (φ-cor (Γ ▹ 1 ∷ ⟦ α ⟧τK ▹ 2 ∷ ⟦ β ⟧τK ⇒ T ο ▹ 4 ∷ ⟦ β ⟧τM) 
-                                                       β (var 4) ass)))))
+                            (abs (ret (φ-cor (Γ ▹ x ∷ ⟦ τ ⟧τM) τ (var x) ass)))
+  φ-cor Γ (α ⇒ β) tMm der = abs (abs (bind (app (weak (weak der)) (weak (ψ-cor (Γ ▹ x ∷ ⟦ α ⟧τK) α (var x) ass))) 
+                           (abs (app (weak ass) (φ-cor (Γ ▹ x ∷ ⟦ α ⟧τK ▹ k ∷ ⟦ β ⟧τK ⇒ T ο ▹ y ∷ ⟦ β ⟧τM) 
+                                                       β (var y) ass)))))
 
   ψ-cor : (Γ : MContext) (α : Type) (tK : MTerm) →   Γ ⊢T tK ∷ ⟦ α ⟧τK   →  Γ ⊢T (ψ⟨ α ⟩ tK) ∷ ⟦ α ⟧τM
   ψ-cor Γ γ tK der = der
   ψ-cor Γ (T τ) tK der = bind der
-                           (abs (ret (ψ-cor (Γ ▹ suc zero ∷ ⟦ τ ⟧τK) τ (var (suc zero)) ass)))
+                           (abs (ret (ψ-cor (Γ ▹ x ∷ ⟦ τ ⟧τK) τ (var x) ass)))
   ψ-cor Γ (α ⇒ β) tK der = abs (app (abs (bind ass (abs (ret (ο⟶ ass))))) 
-                          (app (app (weak der) (φ-cor (Γ ▹ 6 ∷ ⟦ α ⟧τM) α (var 6) ass)) 
-                          (abs (ret (⟶ο (ψ-cor (Γ ▹ 6 ∷ ⟦ α ⟧τM ▹ 7 ∷ ⟦ β ⟧τK) β (var 7) ass))))))
+                          (app (app (weak der) (φ-cor (Γ ▹ a ∷ ⟦ α ⟧τM) α (var a) ass)) 
+                          (abs (ret (⟶ο (ψ-cor (Γ ▹ a ∷ ⟦ α ⟧τM ▹ b ∷ ⟦ β ⟧τK) β (var b) ass))))))
 
 {- 
   Strong specification 
   
   We don't have to construct it from scratch, it sufficess to packages the φ function and φ-cor proof
-  together. -}
+  together.
+-}
 
 mutual
   φ[_] : (α : Type) (Γ : MContext) (tM : MTerm) →   Γ ⊢T tM ∷ ⟦ α ⟧τM   →  Σ[ tK ∶ MTerm ]  Γ ⊢T tK ∷ ⟦ α ⟧τK
