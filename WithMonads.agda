@@ -17,11 +17,11 @@ V = ℕ
 {- The object language -}
 
 data Term : Set where
-  var : (v : V) → Term
-  _$_ : (m n : Term) → Term
-  _↦_ : (v : V) → (e : Term) → Term
-  [_] : (t : Term) → Term
-  μ   : (t : Term) → Term
+  var : (v : V) → Term                               -- variable
+  _$_ : (m n : Term) → Term                          -- function application
+  _↦_ : (v : V) → (e : Term) → Term                  -- lambda abstraction
+  [_] : (t : Term) → Term                            -- monadic reification
+  μ   : (t : Term) → Term                            -- monadic reflexion
 
 -- example terms
 
@@ -34,16 +34,16 @@ t-app-id = t-id $ t-id
 
 
 data Type : Set where
-  γ   : Type
-  T   : (τ : Type) → Type
-  _⇒_ : (τ₁ τ₂ : Type) → Type
+  γ   : Type                                           -- atomic (ground) type
+  T   : (τ : Type) → Type                              -- monadic constructor
+  _⇒_ : (τ₁ τ₂ : Type) → Type                          -- arrow type
 
 data Judgement : Set where
-  _∷_ : (x : V) → (τ : Type) → Judgement
+  _∷_ : (x : V) → (τ : Type) → Judgement               -- variable type declaration/assignment
 
 data Context : Set where
-  ∅ : Context
-  _▹_ : (Γ : Context) → (j : Judgement) → Context
+  ∅ : Context                                          -- empty context
+  _▹_ : (Γ : Context) → (j : Judgement) → Context      -- a single assingment with the rest of the context
 
 infixl 40 _▹_
 infix  50 _∷_
@@ -97,8 +97,8 @@ data MTerm : Set where
   _>>=_  : (m f : MTerm) → MTerm
 
   -- casts to and from ο
-  ο↑ : (t : MTerm) → MTerm
-  ο↓ : (t : MTerm) → MTerm
+  ο↑ : (t : MTerm) → MTerm                                   -- [up]cast to ο
+  ο↓ : (t : MTerm) → MTerm                                   -- [down]cast to o
 
 data MJudgement : Set where
   _∷_ : (x : V) → (τ : MType) → MJudgement
@@ -139,13 +139,9 @@ data MHasType : MTerm → MType → Set where
 
 {- Translation into monadic style -}
  
-f = 0
-x = 1
-k = 2
-m = 3
-y = 4
-a = 6
-b = 7
+-- we bind some variables with nice names to be able to use
+-- good names in lambda abstractions
+f = 0 ; x = 1 ; k = 2 ; m = 3 ; y = 4 ; a = 5 ; b = 6
 
 
 -- we start by ignoring types
@@ -307,9 +303,9 @@ mutual
   together.
 -}
 
-mutual
-  φ[_] : (α : Type) (Γ : MContext) (tM : MTerm) →   Γ ⊢T tM ∷ ⟦ α ⟧τM   →  Σ[ tK ∶ MTerm ]  Γ ⊢T tK ∷ ⟦ α ⟧τK
-  φ[ α ] Γ tM der = φ⟨ α ⟩ tM , φ-cor Γ α tM der
 
-  ψ[_] : (α : Type) (Γ : MContext) (tK : MTerm) →   Γ ⊢T tK ∷ ⟦ α ⟧τK   →  Σ[ tM ∶ MTerm ]  Γ ⊢T tM ∷ ⟦ α ⟧τM
-  ψ[ α ] Γ tM der = ψ⟨ α ⟩ tM , ψ-cor Γ α tM der
+φ[_] : (α : Type) (Γ : MContext) (tM : MTerm) →   Γ ⊢T tM ∷ ⟦ α ⟧τM   →  Σ[ tK ∶ MTerm ]  Γ ⊢T tK ∷ ⟦ α ⟧τK
+φ[ α ] Γ tM der = φ⟨ α ⟩ tM , φ-cor Γ α tM der
+
+ψ[_] : (α : Type) (Γ : MContext) (tK : MTerm) →   Γ ⊢T tK ∷ ⟦ α ⟧τK   →  Σ[ tM ∶ MTerm ]  Γ ⊢T tM ∷ ⟦ α ⟧τM
+ψ[ α ] Γ tM der = ψ⟨ α ⟩ tM , ψ-cor Γ α tM der
