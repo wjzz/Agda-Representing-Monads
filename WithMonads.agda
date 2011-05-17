@@ -211,7 +211,7 @@ monad-validness Γ (μ t) τ (refl y) = bind (monad-validness Γ t (T τ) y) (ab
 
 --⟦ [ t ] ⟧K = k ↦ var k $ (⟦ t ⟧K $ (x ↦ return (var x)))
 
--- should be like this, but return is a constructor, not a term
+-- should be like this, but return is a term constructor, not a term
 -- ⟦ [ t ] ⟧K = k ↦ var k $ (⟦ t ⟧K $ return)
 
 -- with explicit coersions
@@ -365,3 +365,44 @@ mutual
 
 
 {- The relationship between the two translations. -}
+
+{-
+ with 
+   x₁ : α₁ ▹ x₂ : α₂ ▹ ... ⊢ E : β
+ we have 
+   ⟦ E ⟧M ≡ ⟦ E ⟧K {φ[α]} (return ∘ ψ[β])
+
+   ⟦ E ⟧M >>= k  ≡   ⟦ E ⟧K {φ[α]} (k ∘ ψ[β])
+
+ where the E { σ } notation means a substitution of the free variables
+ in E by σ.
+
+-}
+
+
+{- Shift & reset come into play -}
+
+{- Recall the definitions:
+
+  ⟦ S E ⟧K = λk. ⟦ E ⟧K (λf. f (λv. λk'. k' (k v)) (λx. x))
+  ⟦ # E ⟧K = λk. k (⟦ E ⟧K (λx. x))
+
+-}
+
+{- We suppose that we can express return and >>= in the target language 
+   as pure functions.
+
+   We can then derive that:
+
+   ⟦ returnK ⟧K = λk. k (λa. λk'. k' (return a))
+   
+   ⟦ >>= f ⟧K = λk. k (λa. λk'. k' (a >>= Φ)) where
+       ⟦ f ⟧K = λk. k (λa. λk'. k' (Φ a))
+
+   
+   The interesting thing:
+
+   ⟦ # (return E)    ⟧K   ≡βη   ⟦ [ E ] ⟧K
+   ⟦ S (λk. E >>= k) ⟧K   ≡βη   ⟦  μ E  ⟧K
+
+-}
