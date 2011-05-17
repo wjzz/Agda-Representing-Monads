@@ -38,12 +38,12 @@ data Type : Set where
   T   : (τ : Type) → Type                              -- monadic constructor
   _⇒_ : (τ₁ τ₂ : Type) → Type                          -- arrow type
 
-data Judgement : Set where
-  _∷_ : (x : V) → (τ : Type) → Judgement               -- variable type declaration/assignment
+data Assingment : Set where
+  _∷_ : (x : V) → (τ : Type) → Assingment               -- variable type declaration/assignment
 
 data Context : Set where
   ∅ : Context                                          -- empty context
-  _▹_ : (Γ : Context) → (j : Judgement) → Context      -- a single assingment with the rest of the context
+  _▹_ : (Γ : Context) → (j : Assingment) → Context      -- a single assingment with the rest of the context
 
 infixl 40 _▹_
 infix  50 _∷_
@@ -100,12 +100,12 @@ data MTerm : Set where
   ο↑ : (t : MTerm) → MTerm                                   -- [up]cast to ο
   ο↓ : (t : MTerm) → MTerm                                   -- [down]cast to o
 
-data MJudgement : Set where
-  _∷_ : (x : V) → (τ : MType) → MJudgement
+data MAssingment : Set where
+  _∷_ : (x : V) → (τ : MType) → MAssingment
 
 data MContext : Set where
   ∅ : MContext
-  _▹_ : (Γ : MContext) → (j : MJudgement) → MContext
+  _▹_ : (Γ : MContext) → (j : MAssingment) → MContext
 
 
 data _⊢T_∷_ : (Γ : MContext) → (t : MTerm) → (τ : MType) → Set where
@@ -189,6 +189,16 @@ monad-validness Γ (μ t) τ (refl y) = bind (monad-validness Γ t (T τ) y) (ab
 
 {- Translation to CPS -}
 
+{- Paper notation:
+
+⟦ v ⟧     = λk. k v
+⟦ λv. e ⟧ = λk. k (λv. ⟦ e ⟧)
+⟦ m n ⟧   = λk. ⟦ m ⟧ (λf. ⟦ n ⟧ (λa. f a k))
+⟦ μ t ⟧   = λk. ⟦ t ⟧ (λx. x >>= k)
+⟦ [t] ⟧   = λk. k (⟦ t ⟧ ∘ return)  -- with omitted ο↑ and ο↓ 
+
+-}
+
 -- bare terms
 
 ⟦_⟧K : Term → MTerm
@@ -210,6 +220,7 @@ monad-validness Γ (μ t) τ (refl y) = bind (monad-validness Γ t (T τ) y) (ab
 
 -- type translation
 
+-- This is actually the constructor of the continuation monad transformer
 K : MType → MType
 K τ = (τ ⇒ T ο) ⇒ T ο
 
@@ -217,6 +228,7 @@ K τ = (τ ⇒ T ο) ⇒ T ο
 ⟦ γ ⟧τK = γ
 ⟦ T τ ⟧τK = T ⟦ τ ⟧τK
 ⟦ τ₁ ⇒ τ₂ ⟧τK = ⟦ τ₁ ⟧τK ⇒ K ⟦ τ₂ ⟧τK
+
 
 -- context translation
 
@@ -256,7 +268,47 @@ cps-validness Γ (μ t) τ (refl y) = abs (app (weak (cps-validness Γ t (T τ) 
   φ[ α ] : ⟦ α ⟧τM → ⟦ α ⟧τK
   ψ[ α ] : ⟦ α ⟧τK → ⟦ α ⟧τM
 
-  We want ψ ∘ φ ≡βη id
+  φ[γ]       = id
+  φ[T α]     = fmap φ[α]
+  φ[α ⇒ β] t = λx. λk. t (ψ[α] x) >>= (k ∘ φ[β])
+
+  ψ[γ] = id
+  ψ[T α] = fmap ψ α
+  ψ[α ⇒ β] t = λa. t (φ[α] a) (return ∘ ψ[β])
+
+  We want <φ, ψ> to form a retraction pair, so we need to show
+     ψ ∘ φ ≡βη id
+
+  Proof.
+  ⑴ If τ ≡ γ the thm is trivial.
+
+  ⑵ Suppose t : ⟦T α⟧M ≡ T ⟦α⟧M. Then
+
+    (ψ[T α] ∘ φ[T α]) t     ≡   -- omiting types for brevity
+    (ψ ∘ φ) t               ≡   -- ∘ def.
+     ψ (φ t)                ≡   -- T α case of ψ
+    fmap ψ[α] (φ t)         ≡   -- T α case of φ
+    fmap ψ[α] (fmap φ[α] t) ≡   -- fmap comp law
+    fmap (ψ[α] ∘ φ[α]) t    ≡   -- induction hyp.
+    fmap id t               ≡   -- fmap id law
+    t
+
+   By extentionality rule we get the thm.
+
+  ⑶ suppose t : ⟦α ⇒ β⟧M ≡ ⟦α⟧M ⇒ T ⟦β⟧M. Then
+
+  φ[α ⇒ β] t = λx. λk. t (ψ[α] x) >>= (k ∘ φ[β])
+  ψ[α ⇒ β] t = λa. t (φ[α] a) (return ∘ ψ[β])
+
+  (ψ[T α] ∘ φ[T α]) t                                                  ≡ omiting types for brevity
+  (ψ ∘ φ) t                                                            ≡ ∘ def.
+   ψ (φ t)                                                             ≡ α ⇒ β case of φ
+   ψ (λx. λk. t (ψ[α] x) >>= (k ∘ φ[β]))                               ≡ α ⇒ β case of ψ
+   λa. [λx. λk. t (ψ[α] x) >>= (k ∘ φ[β])] (φ[α] a) (return ∘ ψ[β])    ≡ subst. for x and k
+   λa. t (ψ[α] (φ[α] a)) >>= (return ∘ ψ[β] ∘ φ[β])                    ≡ ind. hyp. x 2
+   λa. t a >>= return                                                  ≡ right return monad law
+   λa. t a                                                             ≡ η rule
+   t ∎
 -}
 
 {- 
@@ -267,14 +319,15 @@ cps-validness Γ (μ t) τ (refl y) = abs (app (weak (cps-validness Γ t (T τ) 
 
 mutual
   φ⟨_⟩ : (α : Type) → (tM : MTerm) → MTerm
-  φ⟨_⟩ γ t = t
-  φ⟨_⟩ (T α) t = t >>= (x ↦ return (φ⟨ α ⟩ (var x))) -- ≡ fmap φ τ
-  φ⟨_⟩ (α ⇒ β) t = x ↦ k ↦ (t $ ψ⟨ α ⟩ (var x)) >>= (y ↦ var k $ φ⟨ β ⟩ (var y))
+  φ⟨ γ ⟩     t = t
+  φ⟨ T α ⟩   t = t >>= (x ↦ return (φ⟨ α ⟩ (var x))) -- ≡ fmap φ τ
+  φ⟨ α ⇒ β ⟩ t = x ↦ k ↦ (t $ ψ⟨ α ⟩ (var x)) >>= (y ↦ var k $ φ⟨ β ⟩ (var y))
 
   ψ⟨_⟩ : (α : Type) → (tK : MTerm) → MTerm
-  ψ⟨_⟩ γ t = t
-  ψ⟨_⟩ (T α) t = t >>= (x ↦ return (ψ⟨ α ⟩ (var x))) -- ≡ fmap ψ τ
-  ψ⟨_⟩ (α ⇒ β) t = a ↦ (m ↦ var m >>= (x ↦ return (ο↓ (var x)))) $ (t $ φ⟨ α ⟩ (var a) $ (b ↦ return (ο↑ (ψ⟨ β ⟩ (var b)))))
+  ψ⟨ γ ⟩     t = t
+  ψ⟨ T α ⟩   t = t >>= (x ↦ return (ψ⟨ α ⟩ (var x))) -- ≡ fmap ψ τ
+  ψ⟨ α ⇒ β ⟩ t = a ↦ (m ↦ var m >>= (x ↦ return (ο↓ (var x)))) 
+                      $ (t $ φ⟨ α ⟩ (var a) $ (b ↦ return (ο↑ (ψ⟨ β ⟩ (var b)))))
 
 
 -- Type-wise correctness of the implementation
@@ -309,3 +362,6 @@ mutual
 
 ψ[_] : (α : Type) (Γ : MContext) (tK : MTerm) →   Γ ⊢T tK ∷ ⟦ α ⟧τK   →  Σ[ tM ∶ MTerm ]  Γ ⊢T tM ∷ ⟦ α ⟧τM
 ψ[ α ] Γ tM der = ψ⟨ α ⟩ tM , ψ-cor Γ α tM der
+
+
+{- The relationship between the two translations. -}
