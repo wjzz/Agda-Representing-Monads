@@ -5,6 +5,7 @@ module SimpleDeBruijin where
 open import Data.Nat
 open import Data.Nat.Theorems
 open import Relation.Nullary
+open import Relation.Binary
 open import Relation.Binary.PropositionalEquality
 
 infixl 50 _$_
@@ -58,6 +59,44 @@ f $ a [ n ↦ s ] = (f [ n ↦ s ]) $ (a [ n ↦ s ])
 beta : (t : Term) → (v : Term) → Term
 beta t v = ↓ (t [ 0 ↦ ↑[ 1 ] v ])
 
+
+{- The βη-equality -}
+
+data _≡βη_ : Term → Term → Set where
+  refl : (t     : Term) → t ≡βη t
+  symm : {t s   : Term} → t ≡βη s → s ≡βη t
+  tran : {t s u : Term} → t ≡βη s → s ≡βη u → t ≡βη u
+
+  app  : {t₁ t₂ s₁ s₂ : Term} → t₁ ≡βη t₂ → s₁ ≡βη s₂ → t₁ $ s₁ ≡βη t₂ $ s₂
+  abs  : {t s         : Term} → t  ≡βη s  → ƛ t ≡βη ƛ s
+
+  β    : (t v : Term) → (ƛ t) $ v ≡βη beta t v
+  η    : (t   : Term) →  ƛ (t $ (# 0)) ≡βη t
+
+
+{- Small step operational semantics -}
+
+-- values
+
+data isValue : (t : Term) → Set where
+  abs : (t : Term) → isValue (ƛ t)
+
+isValue? : (t : Term) → Dec (isValue t)
+isValue? (# n) = no (λ ())
+isValue? (f $ a) = no (λ ())
+isValue? (ƛ t) = yes (abs t)
+
+data _⟶β_ : (t t' : Term) → Set where
+  β : (t v : Term) → isValue v → (ƛ t) $ v ⟶β beta t v
+  
+  app-fun : (t v t' : Term) → isValue v → t ⟶β t' → t $ v ⟶β t' $ v 
+
+  app-arg : (t x x' : Term) → x ⟶β x'  →  t $ x ⟶β t $ x' 
+
+
+{- The notion of normal forms -}
+data inNormalForm : Term → Set where
+  nf : (t : Term) → (∀ (t' : Term) → ¬ t ⟶β t') → inNormalForm t
 
 
 {-
