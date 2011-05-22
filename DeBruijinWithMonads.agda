@@ -5,7 +5,7 @@ module DeBruijinWithMonads where
 open import Data.Nat
 open import Data.Nat.Theorems
 open import Relation.Nullary
---open import Relation.Binary hiding (_⇒_)
+open import Relation.Binary hiding (_⇒_)
 open import Relation.Binary.PropositionalEquality
 
 infixr 60 _⇒_
@@ -114,6 +114,19 @@ data _≡βη_ : Term → Term → Set where
   l-zero : (x t   : Term) → return x >>= t ≡βη t $ x
   assoc  : (m f g : Term) → m >>= (ƛ (f $ (# 0) >>= g)) ≡βη (m >>= f) >>= g
 
+
+-- ≡βη on Term-s forms a setoid
+
+≡βη-Setoid : Setoid _ _
+≡βη-Setoid = record
+  { Carrier = Term
+  ; _≈_     = _≡βη_
+  ; isEquivalence = record
+    { refl  = λ {x} → refl x
+    ; sym   = symm
+    ; trans = tran
+    }
+  }
 
 {- Small step operational semantics -}
 
@@ -274,15 +287,53 @@ mutual
 
   φ-comm : (α : Type) → (t : Term) → ↓[ 0 ] (φ⟨ α ⟩ t [ 0 ↦ # 1 ]) ≡βη φ⟨ α ⟩ (↓[ 0 ] (t [ 0 ↦ # 1 ]))
   φ-comm = {!!}
+
+import Relation.Binary.EqReasoning 
+open Relation.Binary.EqReasoning ≡βη-Setoid
   
 -- main theorem about bare retractions
 
 lem-retraction : ∀ (α : Type)(t : Term) → ψ⟨ α ⟩ (φ⟨ α ⟩ t) ≡βη t
 lem-retraction γ t = refl t
-lem-retraction (T τ) t = 
+lem-retraction (T τ) t = begin
+  ψ⟨ T τ ⟩ (φ⟨ T τ ⟩ t)                                          
+       ≈⟨ refl ((t >>= ƛ (return (φ⟨ τ ⟩ (# 0)))) >>= ƛ (return (ψ⟨ τ ⟩ (# 0)))) ⟩
+
+  (t >>= ƛ (return (φ⟨ τ ⟩ (# 0)))) >>= ƛ (return (ψ⟨ τ ⟩ (# 0))) 
+       ≈⟨ symm (assoc t (ƛ (return (φ⟨ τ ⟩ (# 0)))) (ƛ (return (ψ⟨ τ ⟩ (# 0))))) ⟩
+
+  t >>= ƛ (ƛ (return (φ⟨ τ ⟩ (# zero))) $ # zero >>= ƛ (return (ψ⟨ τ ⟩ (# zero))))
+       ≈⟨ bnd (refl t) (abs (bnd (β (return (φ⟨ τ ⟩ (# zero))) (# zero)) (refl (ƛ (return (ψ⟨ τ ⟩ (# zero)))))))   ⟩
+
+  t >>= ƛ (return (↓[ 0 ] (φ⟨ τ ⟩ (# 0) [ 0 ↦ # 1 ])) >>= ƛ (return (ψ⟨ τ ⟩ (# 0)))) 
+       ≈⟨ bnd (refl t) (abs (bnd (ret lem) (refl (ƛ (return (ψ⟨ τ ⟩ (# zero))))))) ⟩
+
+  t >>= ƛ (return (φ⟨ τ ⟩ (# 0)) >>= ƛ (return (ψ⟨ τ ⟩ (# 0)))) 
+       ≈⟨ bnd (refl t) (abs (l-zero (φ⟨ τ ⟩ (# zero)) (ƛ (return (ψ⟨ τ ⟩ (# zero)))))) ⟩
+
+  t >>= ƛ (ƛ (return (ψ⟨ τ ⟩ (# 0))) $ φ⟨ τ ⟩ (# 0)) 
+       ≈⟨ bnd (refl t) (abs (β (return (ψ⟨ τ ⟩ (# 0))) (φ⟨ τ ⟩ (# 0)))) ⟩
+
+  t >>= ƛ (return (↓[ 0 ] (ψ⟨ τ ⟩ (# 0) [ 0 ↦ ↑[ 1 ∶ 0 ] (φ⟨ τ ⟩ (# 0)) ]))) 
+       ≈⟨ bnd (refl t) (abs (ret lem2)) ⟩
+
+  t >>= ƛ (return (ψ⟨ τ ⟩ (φ⟨ τ ⟩ (# 0)))) 
+       ≈⟨ bnd (refl t) (abs (ret (lem-retraction τ (# 0)))) ⟩
+
+  t >>= ƛ (return (# 0)) 
+       ≈⟨ r-zero t ⟩
+  t ∎ where
+    lem : ↓[ 0 ] (φ⟨ τ ⟩ (# 0) [ 0 ↦ # 1 ]) ≡βη φ⟨ τ ⟩ (# 0)
+    lem = φ-comm τ (# 0)
+  
+    lem2 : ↓[ 0 ] (ψ⟨ τ ⟩ (# 0) [ 0 ↦ ↑[ 1 ∶ 0 ] (φ⟨ τ ⟩ (# 0)) ]) ≡βη ψ⟨ τ ⟩ (φ⟨ τ ⟩ (# 0))
+    lem2 = {!!}
+
+{-
   tran (symm (assoc t (ƛ (return (φ⟨ τ ⟩ (# zero)))) (ƛ (return (ψ⟨ τ ⟩ (# zero)))))) 
   (tran (bnd (refl t) (abs (bnd (β (return (φ⟨ τ ⟩ (# zero))) (# zero)) (refl (ƛ (return (ψ⟨ τ ⟩ (# zero)))))))) 
   (tran (bnd (refl t) (abs (bnd (ret lem) (refl (ƛ (return (ψ⟨ τ ⟩ (# zero)))))))) 
+
   (tran (bnd (refl t) (abs (tran (l-zero (φ⟨ τ ⟩ (# zero)) (ƛ (return (ψ⟨ τ ⟩ (# zero))))) 
   (tran (β (return (ψ⟨ τ ⟩ (# zero))) (φ⟨ τ ⟩ (# zero))) 
   (ret (tran lem2 (lem-retraction τ (# zero)))))))) 
@@ -292,7 +343,15 @@ lem-retraction (T τ) t =
   
     lem2 : ↓[ 0 ] (ψ⟨ τ ⟩ (# 0) [ 0 ↦ ↑[ 1 ∶ 0 ] (φ⟨ τ ⟩ (# 0)) ]) ≡βη ψ⟨ τ ⟩ (φ⟨ τ ⟩ (# 0))
     lem2 = {!!}
-
-    -- potrzeba lematu dotyczacego tego, ze ψ i φ nie dodaja nowych zmiennych wolnych
-    -- zatem komutuja z podstawieniami
+-}
 lem-retraction (τ₁ ⇒ τ₂) t = {!!}
+
+
+
+lem-test : (ƛ (# 0)) $ # 0 ≡βη # 0
+lem-test = begin
+  (ƛ (# 0)) $ # 0 ≈⟨ β (# zero) (# zero) ⟩
+  # 0 ∎
+
+test : {A B : Set}(f : A → B) → f ≡ (λ x → f x)
+test f = refl
