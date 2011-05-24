@@ -12,15 +12,14 @@ open import Data.Empty
 open import Data.List
 open import Data.List.Utils
 open import Data.Nat
-open import Data.Nat.Theorems
-open import Data.Fin
+open import Data.Nat.Utils
 
 open import Relation.Binary
 open import Relation.Binary.PropositionalEquality
 open import Relation.Nullary
 
--- the main module is parametrized by the name type, a notion of equality and a comparison that decided the equality
 
+-- the main module is parametrized by the name type, a notion of equality and a comparison that decided the equality
 
 module Untyped (Name : Set) (_≈_ : Name → Name → Set)(_==_ : (n1 n2 : Name) → Dec (n1 ≡ n2)) where
   
@@ -117,7 +116,19 @@ module Untyped (Name : Set) (_≈_ : Name → Name → Set)(_==_ : (n1 n2 : Name
   _#_ : (n : Name) (t : Term) → Set
   x # t = x ∉ fv t
 
+  
+  -- encodings of valid lambda terms
+  -- basically, we want to guarantee, that every bound
+  -- variable has a coresponding lambda somewhere up in the term
 
+  data valid-iter : (t : Term) (n : ℕ) → Set where
+    free  : (n : ℕ) (z :     Name) → valid-iter (F z) n
+    app   : {n : ℕ} (t1 t2 : Term) → valid-iter t1 n      → valid-iter t2 n    → valid-iter (t1 $ t2) n
+    abs   : {n : ℕ} (t :     Term) → valid-iter t (suc n) → valid-iter (ƛ t) n
+    bound : (n k : ℕ) → k < n      → valid-iter (B k) n
+
+  valid : (t : Term) → Set
+  valid t = valid-iter t 0
 
 {-
 -----------------------------------------------------
@@ -130,6 +141,7 @@ module Untyped (Name : Set) (_≈_ : Name → Name → Set)(_==_ : (n1 n2 : Name
 
   lem-apply-id : ∀ (t : Term) → (ƛ (B 0)) $ t ≡βη t
   lem-apply-id t = β (B zero) t
+
 
   -- substitution on a fresh variable doesn't change the term
 
@@ -144,24 +156,43 @@ module Untyped (Name : Set) (_≈_ : Name → Name → Set)(_==_ : (n1 n2 : Name
 
 
   -- abstraction on a fresh variable is an identity
+
   lem-abstraction-fresh-iter : ∀ (n : ℕ) (t : Term) (x : Name) → x # t → abstraction-iter x t n ≡ t
   lem-abstraction-fresh-iter n (B i) x nin = refl
   lem-abstraction-fresh-iter n (F z) x nin with x == z
-  lem-abstraction-fresh-iter n (F z) x nin | yes p = {!!}
-  lem-abstraction-fresh-iter n (F z) x nin | no ¬p = {!!}
+  lem-abstraction-fresh-iter n (F z) x nin | yes p rewrite p = ⊥-elim (nin (in-keep z []))
+  lem-abstraction-fresh-iter n (F z) x nin | no ¬p = refl
   lem-abstraction-fresh-iter n (t1 $ t2) x nin = cong₂ _$_
-                                                   (lem-abstraction-fresh-iter n t1 x
-                                                    (lem-∈-app-l x (fv t1) (fv t2) nin))
-                                                   (lem-abstraction-fresh-iter n t2 x
-                                                    (lem-∈-app-r x (fv t1) (fv t2) nin))
+      (lem-abstraction-fresh-iter n t1 x (lem-∈-app-l x (fv t1) (fv t2) nin))
+      (lem-abstraction-fresh-iter n t2 x (lem-∈-app-r x (fv t1) (fv t2) nin))
   lem-abstraction-fresh-iter n (ƛ t) x nin = cong ƛ (lem-abstraction-fresh-iter (suc n) t x nin)
  
 
   lem-abstraction-fresh : ∀ (t : Term) (x : Name) → x # t → abstraction x t ≡ t
   lem-abstraction-fresh t x nin = lem-abstraction-fresh-iter 0 t x nin
-  {- cong₂ _$_ lem-∈-app-l lem-∈-app-r -}
 
-  {- Some false-starts 
-  lem-subst-alternate : ∀ (t s : Term) (x : Name) → t [ x ↦ s ] ≡ instantiate (abstraction x t) s
-  lem-subst-alternate-iter : ∀ (n : ℕ) (t s : Term) (x : Name) → t [ x ↦ s ] ≡ instantiate-iter (abstraction-iter x t n) s n
+
+  -- If we guarantee that t is valid, then subst can be expressed using instantiate and abstraction
+  
+  -- We need a stronger result first, essentialy it's only used in the ƛ case
+
+  lem-subst-alternate-iter : ∀ (n : ℕ) (t s : Term) (x : Name) → (v : valid-iter t n) → 
+                t [ x ↦ s ] ≡ instantiate-iter (abstraction-iter x t n) s n
+  lem-subst-alternate-iter n (B i) s x (bound .n .i y) with i ≟ n
+  ... | yes p = ⊥-elim (lem-less-means-no i n y p)
+  ... | no ¬p = refl
+  lem-subst-alternate-iter n (F z) s x v with x == z
+  lem-subst-alternate-iter n (F z) s x v | yes p rewrite lem-≟-refl n = refl
+  lem-subst-alternate-iter n (F z) s x v | no ¬p = refl
+  lem-subst-alternate-iter n (t1 $ t2) s x (app .t1 .t2 v v') = cong₂ _$_ (lem-subst-alternate-iter n t1 s x v) (lem-subst-alternate-iter n t2 s x v')
+  lem-subst-alternate-iter n (ƛ t) s x (abs .t v) = cong ƛ (lem-subst-alternate-iter (suc n) t s x v)
+
+
+  lem-subst-alternate : ∀ (t s : Term) (x : Name) → (v : valid t) → t [ x ↦ s ] ≡ instantiate (abstraction x t) s
+  lem-subst-alternate t s x v = lem-subst-alternate-iter zero t s x v
+
+
+
+  {-  hints for auto
+  -t 10 -c ⊥-elim cong ƛ cong₂ _$_ lem-∈-app-l lem-∈-app-r 
   -}
