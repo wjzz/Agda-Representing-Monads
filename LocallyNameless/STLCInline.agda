@@ -7,6 +7,8 @@ open import Data.List
 open import Data.List.Utils
 open import Data.Nat
 open import Data.Nat.Utils
+open import Data.Sum
+open import Data.Product renaming (_,_ to _,,_)
 
 open import Relation.Binary hiding (_⇒_)
 open import Relation.Binary.PropositionalEquality
@@ -123,8 +125,8 @@ module SimplyTyped (Name : Set) (_≈_ : Name → Name → Set)(_==_ : (n1 n2 : 
 
   data valid-iter : (t : Term) (n : ℕ) → Set where
     free  : (n : ℕ) (z :     Name) → valid-iter (F z) n
-    app   : {n : ℕ} (t1 t2 : Term) → valid-iter t1 n      → valid-iter t2 n    → valid-iter (t1 $ t2) n
-    abs   : {n : ℕ} (t :     Term) → valid-iter t (suc n) → valid-iter (ƛ t) n
+    app   : {n : ℕ} (t1 t2 : Term) → (v1 : valid-iter t1 n) → (v2 : valid-iter t2 n)  → valid-iter (t1 $ t2) n
+    abs   : {n : ℕ} (t :     Term) → valid-iter t (suc n)   → valid-iter (ƛ t) n
     bound : (n k : ℕ) → k < n      → valid-iter (B k) n
 
   valid : (t : Term) → Set
@@ -235,10 +237,10 @@ module SimplyTyped (Name : Set) (_≈_ : Name → Name → Set)(_==_ : (n1 n2 : 
     ass : {z : Name}{τ : Type} {Γ : Context} → (z ∶ τ) ∈ Γ → Γ ⊢ F z ∶ τ
 
     app : {Γ : Context} {t s : Term} (τ₁ τ₂ : Type) →
-          Γ ⊢ t ∶ τ₁ ⇒ τ₂   →   Γ ⊢ s ∶ τ₁   →    Γ ⊢ t $ s ∶ τ₂
+          (d1 : Γ ⊢ t ∶ τ₁ ⇒ τ₂)   →   (d2 : Γ ⊢ s ∶ τ₁)   →    Γ ⊢ t $ s ∶ τ₂
 
     abs : {Γ : Context}{z : Name}{t : Term} (α τ : Type) →
-          Γ , z ∶ α ⊢ t ∶ τ   →    Γ ⊢ ƛ (abstraction z t) ∶ α ⇒ τ
+          (d : Γ , z ∶ α ⊢ t ∶ τ)   →    Γ ⊢ ƛ (abstraction z t) ∶ α ⇒ τ
 
     -- other possibility
     -- this one is actually used in the document
@@ -278,3 +280,59 @@ module SimplyTyped (Name : Set) (_≈_ : Name → Name → Set)(_==_ : (n1 n2 : 
 
   lem-omega : Ω ⟶β Ω
   lem-omega = β (abs (B zero $ B zero))
+
+  
+
+  -- the progress theorem
+  lem-progress : ∀ (t : Term) (τ : Type) → valid t → ∅ ⊢ t ∶ τ → value t ⊎ ∃ (λ t' → t ⟶β t')
+  lem-progress (B i) τ (bound .0 .i ()) der
+  lem-progress (F z) τ v (ass ())
+  lem-progress (t1 $ t2) τ (app .t1 .t2 v1 v2) (app τ₁ .τ d1 d2) with lem-progress t1 (τ₁ ⇒ τ) v1 d1
+  lem-progress (.(ƛ t) $ t2) τ (app .t1 .t2 v1 v2) (app τ₁ .τ d1 d2) | inj₁ (abs t) with lem-progress t2 τ₁ v2 d2
+  ... | inj₁ t2-val  = inj₂ (instantiate-iter t t2 zero ,, β t2-val)
+  ... | inj₂ t2-prog = inj₂ (ƛ t $ proj₁ t2-prog ,, app-a (abs t) (proj₂ t2-prog))
+  lem-progress (t1 $ t2) τ (app .t1 .t2 v1 v2) (app τ₁ .τ d1 d2) | inj₂ t1-prog = inj₂ (proj₁ t1-prog $ t2 ,, app-f (proj₂ t1-prog))
+  lem-progress (ƛ t) τ v der = inj₁ (abs t)
+
+  -- substitution lemma
+  
+  lem-subsitution-iter : ∀ (n : ℕ) (t t2 : Term) (τ₁ τ₂ : Type) → valid-iter (ƛ t) n → valid-iter t2 n → value t2 → ∅ ⊢ ƛ t ∶ τ₁ ⇒ τ₂ → ∅ ⊢ t2 ∶ τ₁ → 
+    ∅ ⊢ instantiate-iter t t2 n ∶ τ₂
+  lem-subsitution-iter n (B i) t2 τ₁ τ₂ (abs .(B i) (bound .(suc n) .i (s≤s m≤n))) v2 val2 d1 d2 with i ≟ n
+  ... | yes p = {!!}
+  ... | no ¬p = {!!}
+  lem-subsitution-iter n (F z) t2 τ₁ τ₂ v1 v2 val2 d1 d2 = {!!}
+  lem-subsitution-iter n (t1 $ t2) t3 τ₁ τ₂ v1 v2 val2 d1 d2 = {!!}
+  lem-subsitution-iter n (ƛ t) t2 τ₁ τ₂ v1 v2 val2 d1 d2 = {!!}
+
+  lem-subsitution : ∀ (t t2 : Term) (τ₁ τ₂ : Type) → valid (ƛ t) → valid t2 → value t2 → ∅ ⊢ ƛ t ∶ τ₁ ⇒ τ₂ → ∅ ⊢ t2 ∶ τ₁
+                    → ∅ ⊢ instantiate t t2 ∶ τ₂
+  lem-subsitution = lem-subsitution-iter zero
+
+  -- type preservation theorem
+  lem-type-presservation : ∀ (t t' : Term) (τ : Type) → valid t → ∅ ⊢ t ∶ τ → (t ⟶β t') → ∅ ⊢ t' ∶ τ
+  lem-type-presservation (B i) t' τ (bound .0 .i ()) der red
+  lem-type-presservation (F z) t' τ v (ass ()) red
+
+  lem-type-presservation (.(ƛ t) $ t2) .(instantiate-iter t t2 0) τ (app .(ƛ t) .t2 v1 v2) (app τ₁ .τ d1 d2) (β {t} y) 
+     = lem-subsitution t t2 τ₁ τ v1 v2 y d1 d2 
+  
+  lem-type-presservation (t1 $ t2) .(t' $ t2) τ (app .t1 .t2 v1 v2) (app τ₁ .τ d1 d2) (app-f {.t1} {t'} y) = 
+    app τ₁ τ (lem-type-presservation t1 t' (τ₁ ⇒ τ) v1 d1 y) d2
+  lem-type-presservation (t1 $ t2) .(t1 $ s') τ (app .t1 .t2 v1 v2) (app τ₁ .τ d1 d2) (app-a {.t1} {.t2} {s'} y y') =
+    app τ₁ τ d1 (lem-type-presservation t2 s' τ₁ v2 d2 y')
+
+  lem-type-presservation (ƛ .(abstraction-iter z t 0)) t' .(α ⇒ τ) v (abs {.[]} {z} {t} α τ d) ()
+
+
+  -- the slogan theorem
+  lem-well-typed-cant-go-bad : ∀ (t : Term) (τ : Type) → valid t → ∅ ⊢ t ∶ τ → ∃ (λ val → value val × (t ≡ val ⊎ t ⟶β val))
+  lem-well-typed-cant-go-bad (B i) τ (bound .0 .i ()) der
+  lem-well-typed-cant-go-bad (F z) τ v (ass ())
+  lem-well-typed-cant-go-bad (t1 $ t2) τ (app .t1 .t2 v1 v2) (app τ₁ .τ d1 d2) with lem-well-typed-cant-go-bad t1 ((τ₁ ⇒ τ)) v1 d1
+  ... | val ,, vval ,, inj₁ t1=val = {!!}
+  ... | val ,, vval ,, inj₂ t1>val = {!!}
+  lem-well-typed-cant-go-bad (ƛ t) τ v der = ƛ t ,, abs t ,, inj₁ refl
+
+-- it seems that I should change the computation rules so that the simple case is in the bottom
+
