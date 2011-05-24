@@ -8,6 +8,9 @@
 
 module UntypedLC where
 
+open import Data.Empty
+open import Data.List
+open import Data.List.Utils
 open import Data.Nat
 open import Data.Nat.Theorems
 open import Data.Fin
@@ -19,7 +22,7 @@ open import Relation.Nullary
 -- the main module is parametrized by the name type, a notion of equality and a comparison that decided the equality
 
 
-module Untyped (Name : Set) (_≈_ : Name → Name → Set) (≈-equiv : IsEquivalence _≈_)(_==_ : (n1 n2 : Name) → Dec (n1 ≈ n2)) where
+module Untyped (Name : Set) (_≈_ : Name → Name → Set)(_==_ : (n1 n2 : Name) → Dec (n1 ≡ n2)) where
   
   -- the type of terms
   infixl 5 _$_
@@ -44,7 +47,8 @@ module Untyped (Name : Set) (_≈_ : Name → Name → Set) (≈-equiv : IsEquiv
 
 
   -- abstract takes a name and binds it at the top-most level
-  -- i.e. abstract x (λ. 0 x) ==> λ (λ 0 1)
+  -- i.e. abstract x (λ. 0 x) ==> (λ 0 1) 
+  --                         ! it does not wrap it with a ƛ!
   abstraction : (z : Name) → (t : Term) → Term
   abstraction z t = abstraction-iter z t 0
 
@@ -80,9 +84,10 @@ module Untyped (Name : Set) (_≈_ : Name → Name → Set) (≈-equiv : IsEquiv
   ƛ t       [ x ↦ s ] = ƛ (t [ x ↦ s ])
 
 
+  -- the βη equality
+
   infix 4 _≡βη_
 
-  -- the βη equality
   data _≡βη_ : (t s : Term) → Set where
   
     -- equivalence relation rules
@@ -99,6 +104,20 @@ module Untyped (Name : Set) (_≈_ : Name → Name → Set) (≈-equiv : IsEquiv
     β : (t s : Term) → (ƛ t) $ s ≡βη instantiate t s
 
 
+  -- free variables
+
+  fv : (t : Term) → List Name
+  fv (B i)     = []
+  fv (F z)     = z ∷ []
+  fv (t1 $ t2) = fv t1 ++ fv t2
+  fv (ƛ t)     = fv t
+
+  -- fresh variables
+
+  _#_ : (n : Name) (t : Term) → Set
+  x # t = x ∉ fv t
+
+
 
 {-
 -----------------------------------------------------
@@ -106,15 +125,42 @@ module Untyped (Name : Set) (_≈_ : Name → Name → Set) (≈-equiv : IsEquiv
 -----------------------------------------------------
 -}
 
+  -- id t ≡βη t
   -- derived automatically
+
   lem-apply-id : ∀ (t : Term) → (ƛ (B 0)) $ t ≡βη t
   lem-apply-id t = β (B zero) t
 
-  -- unpacking some properties of ≈ (Name equality)
+  -- substitution on a fresh variable doesn't change the term
 
-  ≈-refl : Reflexive (_≈_)
-  ≈-refl = IsEquivalence.refl ≈-equiv
-  
+  lem-subst-fresh : ∀ (t s : Term)(x : Name) → x # t → t [ x ↦ s ] ≡ t
+  lem-subst-fresh (B i) s x nin = refl
+  lem-subst-fresh (F z) s x nin with x == z
+  lem-subst-fresh (F z) s x nin | yes p rewrite p = ⊥-elim (nin (in-keep z []))
+  lem-subst-fresh (F z) s x nin | no ¬p = refl
+  lem-subst-fresh (t1 $ t2) s x nin = cong₂ _$_ (lem-subst-fresh t1 s x (lem-∈-app-l x (fv t1) (fv t2) nin)) 
+                                                (lem-subst-fresh t2 s x (lem-∈-app-r x (fv t1) (fv t2) nin))
+  lem-subst-fresh (ƛ t) s x nin = cong ƛ (lem-subst-fresh t s x nin)
+
+
+  -- abstraction on a fresh variable is an identity
+  lem-abstraction-fresh-iter : ∀ (n : ℕ) (t : Term) (x : Name) → x # t → abstraction-iter x t n ≡ t
+  lem-abstraction-fresh-iter n (B i) x nin = refl
+  lem-abstraction-fresh-iter n (F z) x nin with x == z
+  lem-abstraction-fresh-iter n (F z) x nin | yes p = {!!}
+  lem-abstraction-fresh-iter n (F z) x nin | no ¬p = {!!}
+  lem-abstraction-fresh-iter n (t1 $ t2) x nin = cong₂ _$_
+                                                   (lem-abstraction-fresh-iter n t1 x
+                                                    (lem-∈-app-l x (fv t1) (fv t2) nin))
+                                                   (lem-abstraction-fresh-iter n t2 x
+                                                    (lem-∈-app-r x (fv t1) (fv t2) nin))
+  lem-abstraction-fresh-iter n (ƛ t) x nin = cong ƛ (lem-abstraction-fresh-iter (suc n) t x nin)
+ 
+
+  lem-abstraction-fresh : ∀ (t : Term) (x : Name) → x # t → abstraction x t ≡ t
+  lem-abstraction-fresh t x nin = lem-abstraction-fresh-iter 0 t x nin
+  {- cong₂ _$_ lem-∈-app-l lem-∈-app-r -}
+
   {- Some false-starts 
   lem-subst-alternate : ∀ (t s : Term) (x : Name) → t [ x ↦ s ] ≡ instantiate (abstraction x t) s
   lem-subst-alternate-iter : ∀ (n : ℕ) (t s : Term) (x : Name) → t [ x ↦ s ] ≡ instantiate-iter (abstraction-iter x t n) s n
