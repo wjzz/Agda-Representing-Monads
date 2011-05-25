@@ -165,23 +165,26 @@ module SimplyTyped (Name : Set) (_≈_ : Name → Name → Set)(_==_ : (n1 n2 : 
   ==-refl x with x == x
   ==-refl x | yes refl = refl
   ==-refl x | no ¬p = ⊥-elim (¬p refl)
-  
+
+  {- BASE 
+       global ⊥-elim cong cong₂ lem-∈-app-l lem-∈-app-r lem-less-means-no lem-≟-refl ==-refl sym
+  -}
+
+
 
   {- the duality between variable opening and closing in two parts -}
 
   lem-open-then-close-iter : ∀ (n : ℕ) (t : Term) → (x : Name) → x # t → t ≡ abstraction-iter x (var-open-iter t x n) n
-  lem-open-then-close-iter b (B i) x x#t with i ≟ b
-  lem-open-then-close-iter b (B i) x x#t | yes p rewrite ==-refl x | p = refl
-  lem-open-then-close-iter b (B i) x x#t | no ¬p = refl
-  lem-open-then-close-iter b (F z) x x#t with x == z
-  lem-open-then-close-iter b (F z) .z x#t | yes refl = ⊥-elim (x#t (in-keep z []))
-  lem-open-then-close-iter b (F z) x x#t | no ¬p = refl
-  lem-open-then-close-iter b (t1 $ t2) x x#t = cong₂ _$_
-                                                 (lem-open-then-close-iter b t1 x
-                                                  (lem-∈-app-l x (fv t1) (fv t2) x#t))
-                                                 (lem-open-then-close-iter b t2 x
-                                                  (lem-∈-app-r x (fv t1) (fv t2) x#t))
-  lem-open-then-close-iter b (ƛ t) x x#t = cong ƛ (lem-open-then-close-iter (suc b) t x x#t)
+  lem-open-then-close-iter n (B i) x x#t with i ≟ n
+  lem-open-then-close-iter n (B i) x x#t | yes p rewrite ==-refl x | p = refl
+  lem-open-then-close-iter n (B i) x x#t | no ¬p = refl
+  lem-open-then-close-iter n (F z) x x#t with x == z
+  lem-open-then-close-iter n (F z) .z x#t | yes refl = ⊥-elim (x#t (in-keep z []))
+  lem-open-then-close-iter n (F z) x x#t | no ¬p = refl
+  lem-open-then-close-iter n (t1 $ t2) x x#t = cong₂ _$_ (lem-open-then-close-iter n t1 x (lem-∈-app-l x (fv t1) (fv t2) x#t)) 
+                                                         (lem-open-then-close-iter n t2 x (lem-∈-app-r x (fv t1) (fv t2) x#t))
+  lem-open-then-close-iter n (ƛ t) x x#t = cong ƛ (lem-open-then-close-iter (suc n) t x x#t)
+
 
   lem-close-then-open-iter : ∀ (n : ℕ) (t : Term) → (x : Name) → valid-iter t n → t ≡ var-open-iter (abstraction-iter x t n) x n
   lem-close-then-open-iter n (B i) x v with i ≟ n
@@ -229,7 +232,7 @@ module SimplyTyped (Name : Set) (_≈_ : Name → Name → Set)(_==_ : (n1 n2 : 
  
 
   lem-abstraction-fresh : ∀ (t : Term) (x : Name) → x # t → abstraction x t ≡ t
-  lem-abstraction-fresh t x nin = lem-abstraction-fresh-iter 0 t x nin
+  lem-abstraction-fresh = lem-abstraction-fresh-iter zero
 
 
   -- If we guarantee that t is valid, then subst can be expressed using instantiate and abstraction
@@ -249,13 +252,13 @@ module SimplyTyped (Name : Set) (_≈_ : Name → Name → Set)(_==_ : (n1 n2 : 
 
 
   lem-subst-alternate : ∀ (t s : Term) (x : Name) → (v : valid t) → t [ x ↦ s ] ≡ instantiate (abstraction x t) s
-  lem-subst-alternate t s x v = lem-subst-alternate-iter zero t s x v
+  lem-subst-alternate = lem-subst-alternate-iter zero
 
-
-
-  {-  hints for auto
-  -t 10 -c ⊥-elim cong ƛ cong₂ _$_ lem-∈-app-l lem-∈-app-r 
+  -- a base of lemmas concerned with the instantiate, abstraction and var-open functions
+  {- BASE 
+      nameless lem-open-then-close lem-close-then-open lem-subst-alternate lem-abstraction-fresh lem-subst-fresh  
   -}
+
 
   -- end of copy pasting
 
@@ -356,12 +359,7 @@ module SimplyTyped (Name : Set) (_≈_ : Name → Name → Set)(_==_ : (n1 n2 : 
   
   lem-subsitution-iter : ∀ (n : ℕ) (t t2 : Term) (τ₁ τ₂ : Type) → valid-iter (ƛ t) n → valid-iter t2 n → value t2 → ∅ ⊢ ƛ t ∶ τ₁ ⇒ τ₂ → ∅ ⊢ t2 ∶ τ₁ → 
     ∅ ⊢ instantiate-iter t t2 n ∶ τ₂
-  lem-subsitution-iter n (B i) t2 τ₁ τ₂ (abs .(B i) (bound .(suc n) .i (s≤s m≤n))) v2 val2 d1 d2 with i ≟ n
-  ... | yes p = {!!}
-  ... | no ¬p = {!!}
-  lem-subsitution-iter n (F z) t2 τ₁ τ₂ v1 v2 val2 d1 d2 = {!!}
-  lem-subsitution-iter n (t1 $ t2) t3 τ₁ τ₂ v1 v2 val2 d1 d2 = {!!}
-  lem-subsitution-iter n (ƛ t) t2 τ₁ τ₂ v1 v2 val2 d1 d2 = {!!}
+  lem-subsitution-iter n t1 t2 τ₁ τ₂ v1 v2 val2 d1 d2 = {!!}
 
   lem-subsitution : ∀ (t t2 : Term) (τ₁ τ₂ : Type) → valid (ƛ t) → valid t2 → value t2 → ∅ ⊢ ƛ t ∶ τ₁ ⇒ τ₂ → ∅ ⊢ t2 ∶ τ₁
                     → ∅ ⊢ instantiate t t2 ∶ τ₂
