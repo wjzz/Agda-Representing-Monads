@@ -71,6 +71,22 @@ module SimplyTyped (Name : Set) (_≈_ : Name → Name → Set)(_==_ : (n1 n2 : 
   instantiate t s = instantiate-iter t s 0
 
   
+  -- we can also define a special case for the instantiate function
+  -- when we open a bound variable for a given name (instead of just any term)
+  -- in order for this function to be correct, z should be fresh in t
+  -- (this precondition will be stated in the theorems and lemmas
+  var-open-iter : (t : Term) → (z : Name) → (n : ℕ)  → Term
+  var-open-iter (B i) z n with i ≟ n
+  var-open-iter (B i) z n | yes p = F z
+  var-open-iter (B i) z n | no ¬p = B i
+  var-open-iter (F x) z n = F x
+  var-open-iter (t1 $ t2) z n = var-open-iter t1 z n $ var-open-iter t2 z n
+  var-open-iter (ƛ t) z n = ƛ (var-open-iter t z (suc n))
+
+  var-open : (t : Term) → (z : Name) → Term
+  var-open t z = var-open-iter t z 0
+
+
   -- having defined instantiate and abstraction we can now define subst as
   -- subst t x s ≡ t [ x ↦ s ] = instantiate (abstraction x t) s
   --
@@ -83,27 +99,6 @@ module SimplyTyped (Name : Set) (_≈_ : Name → Name → Set)(_==_ : (n1 n2 : 
   F z       [ x ↦ s ] | no ¬p = F z
   (t1 $ t2) [ x ↦ s ] = t1 [ x ↦ s ] $ t2 [ x ↦ s ]
   ƛ t       [ x ↦ s ] = ƛ (t [ x ↦ s ])
-
-
-  -- the βη equality
-
-  infix 4 _≡βη_
-
-  data _≡βη_ : (t s : Term) → Set where
-  
-    -- equivalence relation rules
-    refl : {t     : Term} → t ≡βη t
-    symm : {t s   : Term} → t ≡βη s → s ≡βη t
-    tran : {t s u : Term} → t ≡βη s → s ≡βη u → t ≡βη u
-
-    -- congruence rules
-    app : {t1 s1 t2 s2 : Term} → t1 ≡βη s1 → t2 ≡βη s2 → t1 $ t2 ≡βη s1 $ s2
-    abs : {t s         : Term} → t  ≡βη s → ƛ t ≡βη ƛ s
-
-    -- computational rules
-    η : {t : Term} → ƛ (t $ B 0) ≡βη t
-    β : (t s : Term) → (ƛ t) $ s ≡βη instantiate t s
-
 
   -- free variables
 
@@ -132,6 +127,27 @@ module SimplyTyped (Name : Set) (_≈_ : Name → Name → Set)(_==_ : (n1 n2 : 
   valid : (t : Term) → Set
   valid t = valid-iter t 0
 
+  -- the βη equality
+
+  infix 4 _≡βη_
+
+  data _≡βη_ : (t s : Term) → Set where
+  
+    -- equivalence relation rules
+    refl : {t     : Term} → t ≡βη t
+    symm : {t s   : Term} → t ≡βη s → s ≡βη t
+    tran : {t s u : Term} → t ≡βη s → s ≡βη u → t ≡βη u
+
+    -- congruence rules
+    app : {t1 s1 t2 s2 : Term} → t1 ≡βη s1 → t2 ≡βη s2 → t1 $ t2 ≡βη s1 $ s2
+    abs : {t s         : Term} → t  ≡βη s → ƛ t ≡βη ƛ s
+
+    -- computational rules
+    η : {t : Term} → ƛ (t $ B 0) ≡βη t
+    β : (t s : Term) → (ƛ t) $ s ≡βη instantiate t s
+
+
+
 {-
 -----------------------------------------------------
    Some theorems about the notions defined so far
@@ -143,6 +159,48 @@ module SimplyTyped (Name : Set) (_≈_ : Name → Name → Set)(_==_ : (n1 n2 : 
 
   lem-apply-id : ∀ (t : Term) → (ƛ (B 0)) $ t ≡βη t
   lem-apply-id t = β (B zero) t
+
+  -- a function that decided equality must be "reflexive"
+  ==-refl : ∀ (x : Name) → x == x ≡ yes refl
+  ==-refl x with x == x
+  ==-refl x | yes refl = refl
+  ==-refl x | no ¬p = ⊥-elim (¬p refl)
+  
+
+  {- the duality between variable opening and closing in two parts -}
+
+  lem-open-then-close-iter : ∀ (n : ℕ) (t : Term) → (x : Name) → x # t → t ≡ abstraction-iter x (var-open-iter t x n) n
+  lem-open-then-close-iter b (B i) x x#t with i ≟ b
+  lem-open-then-close-iter b (B i) x x#t | yes p rewrite ==-refl x | p = refl
+  lem-open-then-close-iter b (B i) x x#t | no ¬p = refl
+  lem-open-then-close-iter b (F z) x x#t with x == z
+  lem-open-then-close-iter b (F z) .z x#t | yes refl = ⊥-elim (x#t (in-keep z []))
+  lem-open-then-close-iter b (F z) x x#t | no ¬p = refl
+  lem-open-then-close-iter b (t1 $ t2) x x#t = cong₂ _$_
+                                                 (lem-open-then-close-iter b t1 x
+                                                  (lem-∈-app-l x (fv t1) (fv t2) x#t))
+                                                 (lem-open-then-close-iter b t2 x
+                                                  (lem-∈-app-r x (fv t1) (fv t2) x#t))
+  lem-open-then-close-iter b (ƛ t) x x#t = cong ƛ (lem-open-then-close-iter (suc b) t x x#t)
+
+  lem-close-then-open-iter : ∀ (n : ℕ) (t : Term) → (x : Name) → valid-iter t n → t ≡ var-open-iter (abstraction-iter x t n) x n
+  lem-close-then-open-iter n (B i) x v with i ≟ n
+  lem-close-then-open-iter n (B i) x (bound .n .i y) | yes p = ⊥-elim (lem-less-means-no i n y p)
+  lem-close-then-open-iter n (B i) x v | no ¬p = refl
+  lem-close-then-open-iter n (F z) x v with x == z
+  lem-close-then-open-iter n (F z) x v | yes p rewrite lem-≟-refl n | p = refl
+  lem-close-then-open-iter n (F z) x v | no ¬p = refl
+  lem-close-then-open-iter n (t1 $ t2) x (app .t1 .t2 v1 v2) = cong₂ _$_ (lem-close-then-open-iter n t1 x v1) (lem-close-then-open-iter n t2 x v2)
+  lem-close-then-open-iter n (ƛ t) x (abs .t v) = cong ƛ (lem-close-then-open-iter (suc n) t x v)
+
+
+
+  -- having proven the generalizations, we get the main theorems for free
+  lem-open-then-close : ∀ (t : Term) → (x : Name) → x # t → t ≡ abstraction x (var-open t x)
+  lem-open-then-close = lem-open-then-close-iter 0
+
+  lem-close-then-open : ∀ (t : Term) → (x : Name) → valid t → t ≡ var-open (abstraction x t) x
+  lem-close-then-open = lem-close-then-open-iter 0
 
 
   -- substitution on a fresh variable doesn't change the term
