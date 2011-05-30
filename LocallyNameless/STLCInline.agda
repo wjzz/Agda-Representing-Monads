@@ -7,7 +7,6 @@ open import Data.List
 open import Data.List.Utils
 open import Data.Nat
 open import Data.Nat.Theorems
-open import Data.Nat.Utils using (lem-less-means-no)
 open import Data.Sum
 open import Data.Product renaming (_,_ to _,,_)
 
