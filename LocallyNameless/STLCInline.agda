@@ -115,7 +115,7 @@ module SimplyTyped (Name : Set) (_≈_ : Name → Name → Set)(_==_ : (n1 n2 : 
 
   
   -- encodings of valid lambda terms
-  -- basically, we want to guarantee, that every bound
+  -- basically, we want to guarantee that every bound
   -- variable has a coresponding lambda somewhere up in the term
 
   data valid-iter : (t : Term) (n : ℕ) → Set where
@@ -160,17 +160,13 @@ module SimplyTyped (Name : Set) (_≈_ : Name → Name → Set)(_==_ : (n1 n2 : 
   lem-apply-id : ∀ (t : Term) → (ƛ (B 0)) $ t ≡βη t
   lem-apply-id t = β (B zero) t
 
-  -- a function that decided equality must be "reflexive"
+  -- a function that decides equality must be "reflexive"
   ==-refl : ∀ (x : Name) → x == x ≡ yes refl
   ==-refl x with x == x
   ==-refl x | yes refl = refl
   ==-refl x | no ¬p = ⊥-elim (¬p refl)
 
-  {- BASE 
-       global ⊥-elim cong cong₂ lem-∈-app-l lem-∈-app-r lem-less-means-no lem-≟-refl ==-refl sym
-  -}
-
-
+  {- BASE global ⊥-elim cong cong₂ lem-∈-app-l lem-∈-app-r lem-less-means-no lem-≟-refl ==-refl sym  -} 
 
   {- the duality between variable opening and closing in two parts -}
 
@@ -255,9 +251,7 @@ module SimplyTyped (Name : Set) (_≈_ : Name → Name → Set)(_==_ : (n1 n2 : 
   lem-subst-alternate = lem-subst-alternate-iter zero
 
   -- a base of lemmas concerned with the instantiate, abstraction and var-open functions
-  {- BASE 
-      nameless lem-open-then-close lem-close-then-open lem-subst-alternate lem-abstraction-fresh lem-subst-fresh  
-  -}
+  {- BASE nameless lem-open-then-close lem-close-then-open lem-subst-alternate lem-abstraction-fresh lem-subst-fresh  -}
 
 
   -- end of copy pasting
@@ -291,6 +285,10 @@ module SimplyTyped (Name : Set) (_≈_ : Name → Name → Set)(_==_ : (n1 n2 : 
   _,_ : (Γ : Context) → (j : Assingment) → Context      -- a single assingment with the rest of the context
   Γ , j = j ∷ Γ
   
+  -- domain of a context
+  dom : (Γ : Context) → List Name
+  dom [] = []
+  dom (x ∶ τ ∷ xs) = x ∷ dom xs
 
   -- for starters, we do not force the context to be a set wrt to the names
 
@@ -298,18 +296,11 @@ module SimplyTyped (Name : Set) (_≈_ : Name → Name → Set)(_==_ : (n1 n2 : 
     ass : {z : Name}{τ : Type} {Γ : Context} → (z ∶ τ) ∈ Γ → Γ ⊢ F z ∶ τ
 
     app : {Γ : Context} {t s : Term} (τ₁ τ₂ : Type) →
+          (v1 : valid t) → (v2 : valid s) →
           (d1 : Γ ⊢ t ∶ τ₁ ⇒ τ₂)   →   (d2 : Γ ⊢ s ∶ τ₁)   →    Γ ⊢ t $ s ∶ τ₂
 
-    abs : {Γ : Context}{z : Name}{t : Term} (α τ : Type) →
-          (d : Γ , z ∶ α ⊢ t ∶ τ)   →    Γ ⊢ ƛ (abstraction z t) ∶ α ⇒ τ
-
-    -- other possibility
-    -- this one is actually used in the document
-    -- the approaches seem to be equivalent
-  {-
-    abs2 : {Γ : Context}{z : Name}{t : Term} (α τ : Type) →
-           Γ , z ∶ α ⊢ instantiate (F z) t ∶ τ   →    Γ ⊢ ƛ t ∶ α ⇒ τ
-  -}
+    abs : {Γ : Context}{z : Name}{t : Term} (α τ : Type) → z ∉ fv t → z ∉ dom Γ → 
+          (der : Γ , z ∶ α ⊢ (instantiate t (F z)) ∶ τ)   →    Γ ⊢ ƛ t ∶ α ⇒ τ
 
   
   data value : (t : Term) → Set where
@@ -342,7 +333,60 @@ module SimplyTyped (Name : Set) (_≈_ : Name → Name → Set)(_==_ : (n1 n2 : 
   lem-omega : Ω ⟶β Ω
   lem-omega = β (abs (B zero $ B zero))
 
+  id-type : ∀ {τ} → ∅ ⊢ (ƛ (B 0)) ∶ τ ⇒ τ
+  id-type {τ} = abs τ τ {!lem1!} {!!} {!!}
   
+
+  postulate
+    ass-dec : (a1 a2 : Assingment) → Dec (a1 ≡ a2)
+
+  {- BASE perm perm-in perm-in-rev ass-dec lem-∈-app-l lem-∈-app-r perm-in lem-∈-app lem-∈-neq lem-∈-inside lem-∈-extend-l lem-∈-extend-r  -}
+
+  dom-inv : ∀ (Γ : Context)(z : Name) → z ∈ dom Γ → ∃ (λ τ → z ∶ τ ∈ Γ)
+  dom-inv [] z ()
+  dom-inv (x ∶ τ ∷ xs) .x (in-keep .x .(dom xs)) = τ ,, in-keep (x ∶ τ) xs
+  dom-inv (x ∶ τ ∷ xs) z (in-drop .x y) = proj₁ (dom-inv xs z y) ,, in-drop (x ∶ τ) (proj₂ (dom-inv xs z y))
+
+  dom-in : ∀ (Γ : Context)(z : Name)(τ : Type) → z ∶ τ ∈ Γ → z ∈ dom Γ
+  dom-in [] z τ ()
+  dom-in (x ∶ τ ∷ xs) .x .τ (in-keep .(x ∶ τ) .xs) = in-keep x (dom xs)
+  dom-in (x ∶ τ ∷ xs) z τ' (in-drop .(x ∶ τ) inn) = in-drop x (dom-in xs z τ' inn)
+
+  {- BASE perm dom-inv dom-in  -}
+
+  dom-perm : ∀ (Γ Γ' : Context)(z : Name) → Permutation Γ Γ' → z ∉ dom Γ → z ∉ dom Γ'
+  dom-perm Γ Γ' z perm z∉dom z∈dom' with dom-inv Γ' z z∈dom'
+  dom-perm Γ Γ' z perm z∉dom z∈dom' | τ ,, inn = z∉dom (dom-in Γ z τ (perm-in-rev (z ∶ τ) Γ Γ' ass-dec perm inn))
+         
+  {- BASE perm dom-perm  -}
+
+  -- permutation lemma
+  perm : ∀ (Γ Γ' : Context)(τ : Type)(t : Term) → Permutation Γ Γ' → 
+         Γ ⊢ t ∶ τ   →    Γ' ⊢ t ∶ τ
+  perm .[] .[] τ .(F z) p-nil (ass {z} ())
+  perm .(x ∷ xs ++ ys) .(xs' ++ x ∷ ys') τ .(F z) (p-cons x xs xs' ys ys' y y') (ass {z} y0) with lem-∈-app (z ∶ τ) (x ∷ xs) ys ass-dec y0
+  perm .(x ∷ xs ++ ys) .(xs' ++ x ∷ ys') τ .(F z) (p-cons x xs xs' ys ys' y y') (ass {z} y0) | inj₁ l with ass-dec (z ∶ τ) x
+  perm .(x ∷ xs ++ ys) .(xs' ++ x ∷ ys') τ .(F z) (p-cons x xs xs' ys ys' y y') (ass {z} y0) | inj₁ l | yes p rewrite (sym p) 
+    = ass (lem-∈-inside (z ∶ τ) xs' ys')
+  perm .(x ∷ xs ++ ys) .(xs' ++ x ∷ ys') τ .(F z) (p-cons x xs xs' ys ys' y y') (ass {z} y0) | inj₁ l | no ¬p 
+    = ass (lem-∈-extend-r (z ∶ τ) xs' (x ∷ ys') (perm-in (z ∶ τ) xs xs' ass-dec y (lem-∈-neq (z ∶ τ) x xs ¬p l)))
+  perm .(x ∷ xs ++ ys) .(xs' ++ x ∷ ys') τ .(F z) (p-cons x xs xs' ys ys' y y') (ass {z} y0) | inj₂ r 
+    = ass (lem-∈-extend-l ((z ∶ τ)) (x ∷ ys') xs' (in-drop x (perm-in (z ∶ τ) ys ys' ass-dec y' r)))
+  perm Γ Γ' τ .(t $ s) permu (app {.Γ} {t} {s} τ₁ .τ v1 v2 d1 d2) = app τ₁ τ v1 v2 (perm Γ Γ' (τ₁ ⇒ τ) t permu d1) (perm Γ Γ' τ₁ s permu d2)
+  perm Γ Γ' .(α ⇒ τ) .(ƛ t) permu (abs {.Γ} {z} {t} α τ y y' der) 
+     with perm (z ∶ α ∷ Γ) (z ∶ α ∷ Γ') τ (instantiate-iter t (F z) zero) (p-cons (z ∶ α) [] [] Γ Γ' p-nil permu) der
+  perm Γ Γ' .(α ⇒ τ) .(ƛ t) permu (abs {.Γ} {z} {t} α τ y y' der) | cond0 = abs α τ y (dom-perm Γ Γ' z permu y') cond0
+
+
+  -- weakening lemma
+  weak : ∀ (Γ : Context)(τ α : Type)(t : Term)(x : Name) →
+         Γ ⊢ t ∶ α   →    Γ , x ∶ τ ⊢ t ∶ α
+  weak Γ τ α .(F z) x (ass {z} y) = ass (in-drop (x ∶ τ) y)
+  weak Γ τ α .(t $ s) x (app {.Γ} {t} {s} τ₁ .α v1 v2 d1 d2) 
+    = app τ₁ α v1 v2 (weak Γ τ (τ₁ ⇒ α) t x d1) (weak Γ τ τ₁ s x d2)
+  weak Γ τ .(α ⇒ τ') .(ƛ t) x (abs {.Γ} {z} {t} α τ' y y' der) = {!!} -- permutation lemma needed?
+
+{-  
 
   -- the progress theorem
   lem-progress : ∀ (t : Term) (τ : Type) → valid t → ∅ ⊢ t ∶ τ → value t ⊎ ∃ (λ t' → t ⟶β t')
@@ -392,3 +436,4 @@ module SimplyTyped (Name : Set) (_≈_ : Name → Name → Set)(_==_ : (n1 n2 : 
 
 -- it seems that I should change the computation rules so that the simple case is in the bottom
 
+-}
