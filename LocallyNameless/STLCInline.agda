@@ -270,19 +270,19 @@ module SimplyTyped (Name : Set) (_≈_ : Name → Name → Set)(_==_ : (n1 n2 : 
     γ : Type
     _⇒_ : (τ1 τ2 : Type) → Type  
 
-  data Assingment : Set where
-    _∶_ : (x : Name) → (τ : Type) → Assingment               -- variable type declaration/assignment
+  data Assignment : Set where
+    _∶_ : (x : Name) → (τ : Type) → Assignment               -- variable type declaration/assignment
 
 
   -- for contexts we will use a sugared notation for lists instead
   -- of a seperate datatype to minimalize the number of needed lemmas
   Context : Set
-  Context = List Assingment
+  Context = List Assignment
 
   ∅ : Context
   ∅ = []
 
-  _,_ : (Γ : Context) → (j : Assingment) → Context      -- a single assingment with the rest of the context
+  _,_ : (Γ : Context) → (j : Assignment) → Context      -- a single assingment with the rest of the context
   Γ , j = j ∷ Γ
   
   -- domain of a context
@@ -462,7 +462,7 @@ module SimplyTyped (Name : Set) (_≈_ : Name → Name → Set)(_==_ : (n1 n2 : 
   ------------------------------
 
   postulate
-    ass-dec : (a1 a2 : Assingment) → Dec (a1 ≡ a2)
+    ass-dec : (a1 a2 : Assignment) → Dec (a1 ≡ a2)
 
   {- BASE perm perm-in perm-in-rev ass-dec lem-∈-app-l lem-∈-app-r perm-in lem-∈-app lem-∈-neq lem-∈-inside lem-∈-extend-l lem-∈-extend-r -}
 
