@@ -167,7 +167,7 @@ module SimplyTyped (Name : Set) (_≈_ : Name → Name → Set)(_==_ : (n1 n2 : 
   ==-refl x | no ¬p = ⊥-elim (¬p refl)
 
   {- BASE global ⊥-elim cong cong₂ lem-∈-app-l lem-∈-app-r lem-less-means-no lem-≟-refl ==-refl sym -} 
-  {- BASE arith lem-≤-trans lem-≤-suc -}
+  {- BASE arith lem-≤-trans lem-≤-suc ≤-pred lem-≤-cases-ext -}
 
   {- the duality between variable opening and closing in two parts -}
 
@@ -256,25 +256,26 @@ module SimplyTyped (Name : Set) (_≈_ : Name → Name → Set)(_==_ : (n1 n2 : 
   -- end of copy pasting
 
 
-  
+  ----------------
   -- simple types
-
-  data Type : Set where
-    γ : Type
-    _⇒_ : (τ1 τ2 : Type) → Type
-
-  
-  -- for contexts we will use a sugared notation for lists instead
-  -- of a seperate datatype to minimalize the number of needed lemmas
+  ----------------
 
   infix  3 _⟶β_
   infixl 40 _,_
   infix  50 _∶_
   infixr 60 _⇒_
-   
+
+
+  data Type : Set where
+    γ : Type
+    _⇒_ : (τ1 τ2 : Type) → Type  
+
   data Assingment : Set where
     _∶_ : (x : Name) → (τ : Type) → Assingment               -- variable type declaration/assignment
 
+
+  -- for contexts we will use a sugared notation for lists instead
+  -- of a seperate datatype to minimalize the number of needed lemmas
   Context : Set
   Context = List Assingment
 
@@ -321,7 +322,10 @@ module SimplyTyped (Name : Set) (_≈_ : Name → Name → Set)(_==_ : (n1 n2 : 
     app-a : {t s s' : Term} → value t → s ⟶β s'  → t $ s ⟶β t $ s'
 
 
-  {- some examples -}
+  -----------------
+  -- some examples 
+  -----------------
+
   lem-id : (t : Term) → value t → (ƛ (B 0)) $ t ⟶β t
   lem-id t v = β v
 
@@ -366,23 +370,30 @@ module SimplyTyped (Name : Set) (_≈_ : Name → Name → Set)(_==_ : (n1 n2 : 
   valid-instantiate : ∀ (t s : Term) → valid t → valid s → valid (instantiate t s)
   valid-instantiate = valid-instantiate-iter zero
 
-  {- BASE valid valid-iter-weak valid-instantiate -}
+  valid-instantiate-iter-suc : ∀ (n : ℕ) (t s : Term) → valid-iter t (suc n) → valid-iter s n → valid-iter (instantiate-iter t s n) n
+  valid-instantiate-iter-suc n .(F z) s (free .(suc n) z) val-s = free n z
+  valid-instantiate-iter-suc n .(t1 $ t2) s (app t1 t2 v1 v2) val-s = app (instantiate-iter t1 s n) (instantiate-iter t2 s n)
+                                                                        (valid-instantiate-iter-suc n t1 s v1 val-s)
+                                                                        (valid-instantiate-iter-suc n t2 s v2 val-s)
+  valid-instantiate-iter-suc n .(ƛ t) s (abs t y) val-s = abs (instantiate-iter t s (suc n)) (valid-instantiate-iter-suc (suc n) t s y
+                                                             (valid-iter-weak n s val-s))
+  valid-instantiate-iter-suc n .(B k) s (bound .(suc n) k y) val-s with k ≟ n
+  ... | yes p = val-s
+  ... | no ¬p = bound n k (lem-≤-cases-ext k n (≤-pred y) ¬p)
 
-{-
-Goal: valid-iter (instantiate-iter t s 0) n
-————————————————————————————————————————————————————————————
-v2   : valid-iter s n
-y'   : valid-iter t (suc n)
--}
 
-  valid-red-iter : ∀ (n : ℕ)(t t' : Term) → t ⟶β t' → valid-iter t n → valid-iter t' n
-  valid-red-iter n .(ƛ t $ s) .(instantiate-iter t s 0) (β {t} {s} y) (app .(ƛ t) .s (abs .t y') v2) = {!!}
-  valid-red-iter n .(t $ s) .(t' $ s) (app-f {t} {t'} {s} y) (app .t .s v1 v2) = app t' s (valid-red-iter n t t' y v1) v2
-  valid-red-iter n .(t $ s) .(t $ s') (app-a {t} {s} {s'} y y') (app .t .s v1 v2) = app t s' v1 (valid-red-iter n s s' y' v2)
-  
+  {- BASE valid valid-iter-weak valid-instantiate valid-instantiate-iter-suc -}
 
   valid-red : ∀ (t t' : Term) → t ⟶β t' → valid t → valid t'
-  valid-red = {!!}
+  valid-red .(ƛ t $ s) .(instantiate-iter t s 0) (β {t} {s} y) (app .(ƛ t) .s (abs .t y') v2) = valid-instantiate-iter-suc zero t s y' v2
+  valid-red .(t $ s) .(t' $ s) (app-f {t} {t'} {s} y) (app .t .s v1 v2) = app t' s (valid-red t t' y v1) v2
+  valid-red .(t $ s) .(t $ s') (app-a {t} {s} {s'} y y') (app .t .s v1 v2) = app t s' v1 (valid-red s s' y' v2)
+
+  {- BASE valid valid-red -}
+
+  ------------------------------
+  -- properties of permutations
+  ------------------------------
 
   postulate
     ass-dec : (a1 a2 : Assingment) → Dec (a1 ≡ a2)
@@ -429,6 +440,7 @@ y'   : valid-iter t (suc n)
 
   {- BASE perm perm perm-id -}
 
+
   -- weakening lemma
   weak : ∀ (Γ : Context)(τ α : Type)(t : Term)(x : Name) →
          Γ ⊢ t ∶ α   →    Γ , x ∶ τ ⊢ t ∶ α
@@ -438,9 +450,7 @@ y'   : valid-iter t (suc n)
     τ' (instantiate-iter t (F z) zero) (p-cons (x ∶ τ) (z ∶ α ∷ []) (z ∶ α ∷ []) Γ Γ (p-cons (z ∶ α) [] [] [] [] p-nil p-nil) (perm-id Γ)) 
     (weak (z ∶ α ∷ Γ) τ τ' (instantiate-iter t (F z) zero) x (y z z∉t (λ x' → z∉Γ (in-drop x x')))))
 
-  {- BASE context perm weak perm-id -}
-
-  
+  {- BASE context perm weak perm-id -}  
 
   -- the progress theorem
   lem-progress : ∀ (t : Term) (τ : Type) → valid t → ∅ ⊢ t ∶ τ → value t ⊎ ∃ (λ t' → t ⟶β t')
