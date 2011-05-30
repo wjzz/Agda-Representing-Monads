@@ -1,6 +1,7 @@
 module Data.List.Utils where
 
 open import Data.List
+import Data.List.Theorems as T
 
 open import Data.Empty
 open import Data.Sum
@@ -94,4 +95,21 @@ perm-in-rev x .(x' ∷ xs ++ ys) .(xs' ++ x' ∷ ys') cmp (p-cons x' xs xs' ys y
 
 {- BASE in perm-in perm-in-rev -}
 
+postulate
+  perm-trans : ∀ {A : Set} (xs ys zs : List A) → Permutation xs ys → Permutation ys zs → Permutation xs zs
+{-
+perm-trans .[] .[] zs p-nil p2 = p2
+perm-trans .(x ∷ xs ++ ys) .(xs' ++ x ∷ ys') zs (p-cons x xs xs' ys ys' y y') p2 = {!!}
+-}
 
+postulate
+  perm-app : ∀ {A : Set}(xs xs' ys ys' : List A) → Permutation xs xs' → Permutation ys ys' → Permutation (xs ++ ys) (xs' ++ ys')
+
+{-
+
+perm-app [] .[] ys ys' p-nil p2' = p2'
+perm-app (x ∷ .(xs ++ ys0)) .(xs' ++ x ∷ ys1) ys ys' (p-cons .x xs xs' ys0 ys1 y y') p2' rewrite sym (T.lem-app-assoc (x ∷ xs) ys0 ys)
+  = {!perm-trans  !} where
+    lem : Permutation (x ∷ xs ++ ys0 ++ ys) (x ∷ xs' ++ ys1 ++ ys')
+    lem = perm-app (x ∷ xs) (x ∷ xs') (ys0 ++ ys) (ys1 ++ ys') (p-cons x [] [] xs xs' p-nil y) (perm-app ys0 ys1 ys ys' y' p2')
+-}

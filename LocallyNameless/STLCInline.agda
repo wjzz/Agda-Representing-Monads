@@ -290,17 +290,22 @@ module SimplyTyped (Name : Set) (_≈_ : Name → Name → Set)(_==_ : (n1 n2 : 
   dom [] = []
   dom (x ∶ τ ∷ xs) = x ∷ dom xs
 
+  -- well formed contexts
+  data ok : Context → Set where
+    ok-nil  : ok ∅
+    ok-cons : (x : Name) (Γ : Context) (τ : Type) → x ∉ dom Γ → ok Γ → ok (Γ , x ∶ τ)
+
 
   -- for starters, we do not force the context to be a set wrt to the names
 
   data _⊢_∶_ : (Γ : Context) → (t : Term) → (τ : Type) → Set where
-    ass : {z : Name}{τ : Type} {Γ : Context} → (z ∶ τ) ∈ Γ → Γ ⊢ F z ∶ τ
+    ass : {z : Name}{τ : Type} {Γ : Context} → ok Γ → (z ∶ τ) ∈ Γ → Γ ⊢ F z ∶ τ
 
     app : {Γ : Context} {t s : Term} (τ₁ τ₂ : Type) →
-          (v1 : valid t) → (v2 : valid s) →
+          (v1 : valid t) → (v2 : valid s) → (o : ok Γ) →
           (d1 : Γ ⊢ t ∶ τ₁ ⇒ τ₂)   →   (d2 : Γ ⊢ s ∶ τ₁)   →    Γ ⊢ t $ s ∶ τ₂
 
-    abs : {Γ : Context}{t : Term} (α τ : Type) 
+    abs : {Γ : Context}{t : Term} (α τ : Type) → ok Γ
           → ((z : Name) → z ∉ fv t → z ∉ dom Γ → Γ , z ∶ α ⊢ (instantiate t (F z)) ∶ τ)
           → Γ ⊢ ƛ t ∶ α ⇒ τ
 
@@ -339,11 +344,72 @@ module SimplyTyped (Name : Set) (_≈_ : Name → Name → Set)(_==_ : (n1 n2 : 
   lem-omega = β (abs (B zero $ B zero))
 
   id-type : ∀ {τ} → ∅ ⊢ (ƛ (B 0)) ∶ τ ⇒ τ
-  id-type {τ} = abs τ τ (λ z x x' → ass (in-keep (z ∶ τ) []))
+  id-type {τ} = abs τ τ ok-nil (λ z x x' → ass (ok-cons z [] τ x' ok-nil) (in-keep (z ∶ τ) []))
 
   s-comb : ∀ {α τ} → ∃ (λ t → ∅ ⊢ t ∶ α ⇒ τ ⇒ α)
-  s-comb {α} {τ} = ƛ (ƛ (B 1)) ,, abs α (τ ⇒ α) (λ z x x' → abs τ α (λ z' x0 x1 → ass (in-drop (z' ∶ τ) (in-keep (z ∶ α) []))))
+  s-comb {α} {τ} = ƛ (ƛ (B 1)) ,, abs α (τ ⇒ α) ok-nil (λ z x x' →
+    abs τ α (ok-cons z [] α x' ok-nil) (λ z' x0 x1 →  ass (ok-cons z' (z ∶ α ∷ []) τ x1 (ok-cons z [] α x' ok-nil))
+    (in-drop (z' ∶ τ) (in-keep (z ∶ α) []))))
 
+
+  -------------------------------------
+  --      properties of dom & ok     --
+  -------------------------------------
+ 
+  lem-dom-extend-l : ∀ (x : Name) (xs ys : Context) → x ∈ dom xs → x ∈ dom (xs ++ ys)
+  lem-dom-extend-l x [] ys ()
+  lem-dom-extend-l .x' (x' ∶ τ ∷ xs) ys (in-keep .x' .(dom xs)) = in-keep x' (dom (xs ++ ys))
+  lem-dom-extend-l x (x' ∶ τ ∷ xs) ys (in-drop .x' y) = in-drop x' (lem-dom-extend-l x xs ys y)
+
+  lem-dom-extend-r : ∀ (x : Name) (xs ys : Context) → x ∈ dom xs → x ∈ dom (ys ++ xs)
+  lem-dom-extend-r x xs [] inn = inn
+  lem-dom-extend-r x xs (x' ∶ τ ∷ xs') inn with x == x'
+  lem-dom-extend-r x xs (x' ∶ τ ∷ xs') inn | yes p rewrite p = in-keep x' (dom (xs' ++ xs))
+  lem-dom-extend-r x xs (x' ∶ τ ∷ xs') inn | no ¬p = in-drop x' (lem-dom-extend-r x xs xs' inn)
+
+
+  lem-dom-app-inv-l : ∀ (x : Name) (xs ys : Context) → x ∉ dom (xs ++ ys) → x ∉ dom xs
+  lem-dom-app-inv-l x xs ys x∉dom-app x∈dom-xs = x∉dom-app (lem-dom-extend-l x xs ys x∈dom-xs)
+
+  lem-dom-app-inv-r : ∀ (x : Name) (xs ys : Context) → x ∉ dom (xs ++ ys) → x ∉ dom ys
+  lem-dom-app-inv-r x xs ys x∉dom-app x∈dom-ys = x∉dom-app (lem-dom-extend-r x ys xs x∈dom-ys)
+
+  lem-dom-app-inv : ∀ (x : Name) (xs ys : Context) → x ∈ dom (xs ++ ys) → x ∈ dom xs ⊎ x ∈ dom ys
+  lem-dom-app-inv x [] ys in-app' = inj₂ in-app'
+  lem-dom-app-inv .x' (x' ∶ τ ∷ xs) ys (in-keep .x' .(dom (xs ++ ys))) = inj₁ (in-keep x' (dom xs))
+  lem-dom-app-inv x (x' ∶ τ ∷ xs) ys (in-drop .x' y) with lem-dom-app-inv x xs ys y
+  ... | inj₁ l = inj₁ (in-drop x' l)
+  ... | inj₂ r' = inj₂ r'
+
+  lem-dom-not-head : ∀ (x x' : Name)(xs : Context) → x ∈ x' ∷ dom xs → x ≢ x' → x ∈ dom xs
+  lem-dom-not-head .x' x' xs (in-keep .x' .(dom xs)) neq = ⊥-elim (neq refl)
+  lem-dom-not-head x x' xs (in-drop .x' y) neq = y
+
+  {- BASE dom lem-dom-app-inv-l lem-dom-app-inv-r lem-dom-app-inv lem-dom-not-head -}
+
+  lem-ok-app-inv-l : ∀ (xs ys : Context) → ok (xs ++ ys) → ok xs
+  lem-ok-app-inv-l [] ts okk = ok-nil
+  lem-ok-app-inv-l (.(x ∶ τ) ∷ xs) ts (ok-cons x .(xs ++ ts) τ y y') = ok-cons x xs τ (lem-dom-app-inv-l x xs ts y) (lem-ok-app-inv-l xs ts y')
+
+  lem-ok-app-inv-r : ∀ (xs ys : Context) → ok (xs ++ ys) → ok ys
+  lem-ok-app-inv-r [] ys okk = okk
+  lem-ok-app-inv-r (.(x ∶ τ) ∷ xs) ys (ok-cons x .(xs ++ ys) τ y y') = lem-ok-app-inv-r xs ys y'
+
+  {- BASE dom lem-ok-app-inv-l lem-ok-app-inv-r -}
+
+  lem-ok-app-middle : ∀ (x : Name) (τ : Type) (xs ys : Context) → ok (xs ++ ys) → x ∉ dom (xs ++ ys) → ok (xs ++ (x ∶ τ) ∷ ys)
+  lem-ok-app-middle x τ [] ys ok-app x∉dom-app = ok-cons x ys τ x∉dom-app ok-app
+  lem-ok-app-middle x τ (x' ∶ τ' ∷ xs) ys ok-app x∉dom-app with x == x'
+  lem-ok-app-middle x τ (x' ∶ τ' ∷ xs) ys ok-app x∉dom-app | yes p rewrite (sym p) = ⊥-elim (x∉dom-app (in-keep x (dom (xs ++ ys))))
+  lem-ok-app-middle x τ (x' ∶ τ' ∷ xs) ys (ok-cons .x' .(xs ++ ys) .τ' y y') x∉dom-app | no ¬p = ok-cons x' (xs ++ x ∶ τ ∷ ys) τ' 
+    lem (lem-ok-app-middle x τ xs ys y' (λ x0 → x∉dom-app (in-drop x' x0))) where
+      lem : x' ∈ dom (xs ++ x ∶ τ ∷ ys) → ⊥
+      lem x0 with lem-dom-app-inv x' xs (x ∶ τ ∷ ys) x0
+      lem x0 | inj₁ x1 = lem-dom-app-inv-l x' xs ys y x1
+      lem x0 | inj₂ y0 with lem-dom-not-head x' x ys y0 (λ x1 → ¬p (sym x1))
+      ... | cond0 = lem-dom-app-inv-r x' xs ys y cond0
+
+  {- BASE dom lem-ok-app-middle -}
 
   -------------------------------------
   -- validness preserving operatations
@@ -420,12 +486,42 @@ module SimplyTyped (Name : Set) (_≈_ : Name → Name → Set)(_==_ : (n1 n2 : 
   dom-perm-rev Γ Γ' z perm z∉dom' z∈dom with dom-inv Γ z z∈dom
   dom-perm-rev Γ Γ' z perm z∉dom' z∈dom | τ ,, inn = z∉dom' (dom-in Γ' z τ (perm-in (z ∶ τ) Γ Γ' ass-dec perm inn))
 
+  
+
   {- BASE perm dom-perm dom-perm-rev -}
+
+  postulate
+    perm-ok : (xs xs' ys ys' : Context) → Permutation xs xs' → Permutation ys ys' → ok (xs ++ ys) → ok (xs' ++ ys')
+
+  {- BASE perm perm-ok perm-app -}
+
+
+  -- permutations and ok
+  dom-ok : ∀ (Γ Γ' : Context) → Permutation Γ Γ' → ok Γ → ok Γ'
+  dom-ok .[] .[] p-nil okk = okk
+  dom-ok .(x ∶ τ ∷ xs ++ ys) .(xs' ++ x ∶ τ ∷ ys') (p-cons .(x ∶ τ) xs xs' ys ys' y y') (ok-cons x .(xs ++ ys) τ y0 y1) 
+    = lem-ok-app-middle x τ xs' ys' (perm-ok xs xs' ys ys' y y' y1) (λ x' → dom-perm (xs ++ ys) (xs' ++ ys') x (perm-app xs xs' ys ys' y y') y0
+                                                                              x')
+
+  -- postulate
+  -- P xs xs' → P ys ys' → ok (x :: xs ++ ys) → ok (x :: xs' ++ ys')
+  -- P xs xs' → P (x : xs) → P (x : ys')
+
 
   -- permutation lemma
   perm : ∀ (Γ Γ' : Context)(τ : Type)(t : Term) → Permutation Γ Γ' → 
          Γ ⊢ t ∶ τ   →    Γ' ⊢ t ∶ τ
-  perm .[] .[] τ .(F z) p-nil (ass {z} ())
+  perm .[] .[] τ t p-nil der = der
+  perm .(x ∷ xs ++ ys) .(xs' ++ x ∷ ys') τ .(F z) (p-cons x xs xs' ys ys' y y') (ass {z} y0 y1) 
+    = ass (dom-ok (x ∷ xs ++ ys) (xs' ++ x ∷ ys') (p-cons x xs xs' ys ys' y y') y0) 
+      (perm-in (z ∶ τ) (x ∷ xs ++ ys) (xs' ++ x ∷ ys') ass-dec (p-cons x xs xs' ys ys' y y') y1)
+  perm .(x ∷ xs ++ ys) .(xs' ++ x ∷ ys') τ .(t $ s) (p-cons x xs xs' ys ys' y y') (app {.(x ∷ xs ++ ys)} {t} {s} τ₁ .τ v1 v2 o d1 d2) 
+    = {!!}
+  perm .(x ∶ τ' ∷ xs ++ ys) .(xs' ++ x ∶ τ' ∷ ys') .(α ⇒ τ) .(ƛ t) (p-cons .(x ∶ τ') xs xs' ys ys' y y') (abs {.(x ∶ τ' ∷ xs ++ ys)} {t} α τ 
+    (ok-cons x .(xs ++ ys) τ' y0 y1) y2) = abs α τ (dom-ok (x ∶ τ' ∷ xs' ++ ys') (xs' ++ x ∶ τ' ∷ ys') 
+      (p-cons (x ∶ τ') xs' xs' ys' ys' (perm-id xs') (perm-id ys')) {!!}) (λ z z∉t z∉dom → {!!})
+
+{-  perm .[] .[] τ .(F z) p-nil (ass {z} _ ())
   perm .(x ∷ xs ++ ys) .(xs' ++ x ∷ ys') τ .(F z) (p-cons x xs xs' ys ys' y y') (ass {z} y0) with lem-∈-app (z ∶ τ) (x ∷ xs) ys ass-dec y0
   perm .(x ∷ xs ++ ys) .(xs' ++ x ∷ ys') τ .(F z) (p-cons x xs xs' ys ys' y y') (ass {z} y0) | inj₁ l with ass-dec (z ∶ τ) x
   perm .(x ∷ xs ++ ys) .(xs' ++ x ∷ ys') τ .(F z) (p-cons x xs xs' ys ys' y y') (ass {z} y0) | inj₁ l | yes p rewrite (sym p) 
@@ -437,10 +533,10 @@ module SimplyTyped (Name : Set) (_≈_ : Name → Name → Set)(_==_ : (n1 n2 : 
   perm Γ Γ' τ .(t $ s) permu (app {.Γ} {t} {s} τ₁ .τ v1 v2 d1 d2) = app τ₁ τ v1 v2 (perm Γ Γ' (τ₁ ⇒ τ) t permu d1) (perm Γ Γ' τ₁ s permu d2)
   perm Γ Γ' .(α ⇒ τ) .(ƛ t) permu (abs {.Γ} {t} α τ f) = abs α τ (λ z z∉t z∉Γ' → perm (Γ , z ∶ α  ) (z ∶ α ∷ Γ') τ 
      (instantiate-iter t (F z) zero) (p-cons (z ∶ α) [] [] Γ Γ' p-nil permu) (f z z∉t (dom-perm-rev Γ Γ' z permu z∉Γ')))
-
+-}
   {- BASE perm perm perm-id -}
 
-
+{-
   -- weakening lemma
   weak : ∀ (Γ : Context)(τ α : Type)(t : Term)(x : Name) →
          Γ ⊢ t ∶ α   →    Γ , x ∶ τ ⊢ t ∶ α
@@ -463,35 +559,44 @@ module SimplyTyped (Name : Set) (_≈_ : Name → Name → Set)(_==_ : (n1 n2 : 
   lem-progress .(ƛ t) .(α ⇒ τ) val (abs {.[]} {t} α τ y) = inj₁ (abs t)
 
   -- substitution lemma
-  
-  lem-subsitution-iter : ∀ (n : ℕ) (t t2 : Term) (τ₁ τ₂ : Type) → valid-iter (ƛ t) n → valid-iter t2 n → value t2 → ∅ ⊢ ƛ t ∶ τ₁ ⇒ τ₂ → ∅ ⊢ t2 ∶ τ₁ → 
-    ∅ ⊢ instantiate-iter t t2 n ∶ τ₂
-  lem-subsitution-iter n t1 t2 τ₁ τ₂ v1 v2 val2 d1 d2 = {!!}
+    
+  lem-assingment-neq : ∀ (x1 x2 : Name)(τ1 τ2 : Type) → x1 ≢ x2 → x1 ∶ τ1 ≢ x2 ∶ τ2
+  lem-assingment-neq .x2 x2 .τ2 τ2 neq refl = neq refl
+
+
+  lem-subst : ∀ (Γ : Context)(x : Name)(α τ : Type)(t t2 : Term) → 
+              Γ , x ∶ α ⊢ t ∶ τ   → Γ ⊢ t2 ∶ α   → Γ ⊢ t [ x ↦ t2 ] ∶ τ
+  lem-subst Γ x α τ .(F z) t2 (ass {z} y) der2 with x == z
+  ... | yes p rewrite p = {!!} -- needs a statement that Γ is a set
+  ... | no ¬p = ass (lem-∈-neq (z ∶ τ) (x ∶ α) Γ (lem-assingment-neq z x τ α (λ x' → ¬p (sym x'))) y)
+  lem-subst Γ x α τ .(t $ s) t2 (app {.(x ∶ α ∷ Γ)} {t} {s} τ₁ .τ v1 v2 d1 d2) der2 = app τ₁ τ {!!} {!!} {!!} {!!}
+  lem-subst Γ x α .(α' ⇒ τ) .(ƛ t) t2 (abs {.(x ∶ α ∷ Γ)} {t} α' τ y) der2 = {!!}
+
+
+  lem-subsitution-iter : ∀ (n : ℕ) (Γ : Context)(t t2 : Term) (τ₁ τ₂ : Type) → valid-iter (ƛ t) n → valid-iter t2 n → value t2 
+    → Γ ⊢ ƛ t ∶ τ₁ ⇒ τ₂    → Γ ⊢ t2 ∶ τ₁     →  Γ ⊢ instantiate-iter t t2 n ∶ τ₂
+  lem-subsitution-iter n Γ t1 .(ƛ t) .(α ⇒ τ) τ2 (abs .t1 y) valid-t2 (abs t) (abs .(α ⇒ τ) .τ2 y') (abs α τ y0) = {!!}
+--  lem-subsitution-iter n Γ t1 .(ƛ t) .(α ⇒ τ) τ2 (abs .t1 y) valid-t2 (abs t) (abs .(α ⇒ τ) .τ2 y') (abs α τ y0) = ?
 
   lem-subsitution : ∀ (t t2 : Term) (τ₁ τ₂ : Type) → valid (ƛ t) → valid t2 → value t2 → ∅ ⊢ ƛ t ∶ τ₁ ⇒ τ₂ → ∅ ⊢ t2 ∶ τ₁
                     → ∅ ⊢ instantiate t t2 ∶ τ₂
-  lem-subsitution = lem-subsitution-iter zero
+  lem-subsitution = lem-subsitution-iter zero ∅
 
   -- type preservation theorem
   lem-type-presservation : ∀ (t t' : Term) (τ : Type) → valid t → ∅ ⊢ t ∶ τ → (t ⟶β t') → ∅ ⊢ t' ∶ τ
-  lem-type-presservation .(ƛ t $ s) .(instantiate-iter t s 0) τ val-t der (β {t} {s} y) = {!!}
-  lem-type-presservation .(t $ s) .(t' $ s) τ (app .t .s v1 v2) (app τ₁ .τ v3 v4 d1 d2) (app-f {t} {t'} {s} y) = {!!}
-  lem-type-presservation .(t $ s) .(t $ s') τ (app .t .s v1 v2) (app τ₁ .τ v3 v4 d1 d2) (app-a {t} {s} {s'} y y') 
-    = {!!}
-{-
-  lem-type-presservation (B i) t' τ (bound .0 .i ()) der red
-  lem-type-presservation (F z) t' τ v (ass ()) red
-
-  lem-type-presservation (.(ƛ t) $ t2) .(instantiate-iter t t2 0) τ (app .(ƛ t) .t2 v1 v2) (app τ₁ .τ d1 d2) (β {t} y) 
-     = lem-subsitution t t2 τ₁ τ v1 v2 y d1 d2 
+  lem-type-presservation (B i) t' τ valid-t der ()
+  lem-type-presservation (F z) t' τ valid-t der ()
+  lem-type-presservation (ƛ t) t' τ valid-t der ()
+  lem-type-presservation (.(ƛ t) $ t2) .(instantiate-iter t t2 0) τ (app .(ƛ t) .t2 (abs .t y) v2) (app τ₁ .τ v1 v3 d1 d2) (β {t} y') 
+    = lem-subsitution t t2 τ₁ τ v1 v3 y' d1 d2
+  lem-type-presservation (t1 $ t2) .(t' $ t2) τ (app .t1 .t2 v1 v2) (app τ₁ .τ v3 v4 d1 d2) (app-f {.t1} {t'} y) 
+    = app τ₁ τ (valid-red t1 t' y v3) v4
+        (lem-type-presservation t1 t' (τ₁ ⇒ τ) v3 d1 y) d2
+  lem-type-presservation (t1 $ t2) .(t1 $ s') τ (app .t1 .t2 v1 v2) (app τ₁ .τ v3 v4 d1 d2) (app-a {.t1} {.t2} {s'} y y') 
+    = app τ₁ τ v3 (valid-red t2 s' y' v4) d1
+        (lem-type-presservation t2 s' τ₁ v4 d2 y')
   
-  lem-type-presservation (t1 $ t2) .(t' $ t2) τ (app .t1 .t2 v1 v2) (app τ₁ .τ d1 d2) (app-f {.t1} {t'} y) = 
-    app τ₁ τ (lem-type-presservation t1 t' (τ₁ ⇒ τ) v1 d1 y) d2
-  lem-type-presservation (t1 $ t2) .(t1 $ s') τ (app .t1 .t2 v1 v2) (app τ₁ .τ d1 d2) (app-a {.t1} {.t2} {s'} y y') =
-    app τ₁ τ d1 (lem-type-presservation t2 s' τ₁ v2 d2 y')
 
-  lem-type-presservation (ƛ .(abstraction-iter z t 0)) t' .(α ⇒ τ) v (abs {.[]} {z} {t} α τ d) ()
--}
 {-
   -- the slogan theorem
   lem-well-typed-cant-go-bad : ∀ (t : Term) (τ : Type) → valid t → ∅ ⊢ t ∶ τ → ∃ (λ val → value val × (t ≡ val ⊎ t ⟶β val))
@@ -503,5 +608,7 @@ module SimplyTyped (Name : Set) (_≈_ : Name → Name → Set)(_==_ : (n1 n2 : 
   lem-well-typed-cant-go-bad (ƛ t) τ v der = ƛ t ,, abs t ,, inj₁ refl
 
 -- it seems that I should change the computation rules so that the simple case is in the bottom
+
+-}
 
 -}
