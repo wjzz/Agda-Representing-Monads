@@ -166,7 +166,7 @@ module SimplyTyped (Name : Set) (_≈_ : Name → Name → Set)(_==_ : (n1 n2 : 
   ==-refl x | yes refl = refl
   ==-refl x | no ¬p = ⊥-elim (¬p refl)
 
-  {- BASE global ⊥-elim cong cong₂ lem-∈-app-l lem-∈-app-r lem-less-means-no lem-≟-refl ==-refl sym  -} 
+  {- BASE global ⊥-elim cong cong₂ lem-∈-app-l lem-∈-app-r lem-less-means-no lem-≟-refl ==-refl sym -} 
 
   {- the duality between variable opening and closing in two parts -}
 
@@ -251,7 +251,7 @@ module SimplyTyped (Name : Set) (_≈_ : Name → Name → Set)(_==_ : (n1 n2 : 
   lem-subst-alternate = lem-subst-alternate-iter zero
 
   -- a base of lemmas concerned with the instantiate, abstraction and var-open functions
-  {- BASE nameless lem-open-then-close lem-close-then-open lem-subst-alternate lem-abstraction-fresh lem-subst-fresh  -}
+  {- BASE nameless lem-open-then-close lem-close-then-open lem-subst-alternate lem-abstraction-fresh lem-subst-fresh -}
 
 
   -- end of copy pasting
@@ -340,7 +340,7 @@ module SimplyTyped (Name : Set) (_≈_ : Name → Name → Set)(_==_ : (n1 n2 : 
   postulate
     ass-dec : (a1 a2 : Assingment) → Dec (a1 ≡ a2)
 
-  {- BASE perm perm-in perm-in-rev ass-dec lem-∈-app-l lem-∈-app-r perm-in lem-∈-app lem-∈-neq lem-∈-inside lem-∈-extend-l lem-∈-extend-r  -}
+  {- BASE perm perm-in perm-in-rev ass-dec lem-∈-app-l lem-∈-app-r perm-in lem-∈-app lem-∈-neq lem-∈-inside lem-∈-extend-l lem-∈-extend-r -}
 
   dom-inv : ∀ (Γ : Context)(z : Name) → z ∈ dom Γ → ∃ (λ τ → z ∶ τ ∈ Γ)
   dom-inv [] z ()
@@ -352,13 +352,13 @@ module SimplyTyped (Name : Set) (_≈_ : Name → Name → Set)(_==_ : (n1 n2 : 
   dom-in (x ∶ τ ∷ xs) .x .τ (in-keep .(x ∶ τ) .xs) = in-keep x (dom xs)
   dom-in (x ∶ τ ∷ xs) z τ' (in-drop .(x ∶ τ) inn) = in-drop x (dom-in xs z τ' inn)
 
-  {- BASE perm dom-inv dom-in  -}
+  {- BASE perm dom-inv dom-in -}
 
   dom-perm : ∀ (Γ Γ' : Context)(z : Name) → Permutation Γ Γ' → z ∉ dom Γ → z ∉ dom Γ'
   dom-perm Γ Γ' z perm z∉dom z∈dom' with dom-inv Γ' z z∈dom'
   dom-perm Γ Γ' z perm z∉dom z∈dom' | τ ,, inn = z∉dom (dom-in Γ z τ (perm-in-rev (z ∶ τ) Γ Γ' ass-dec perm inn))
          
-  {- BASE perm dom-perm  -}
+  {- BASE perm dom-perm -}
 
   -- permutation lemma
   perm : ∀ (Γ Γ' : Context)(τ : Type)(t : Term) → Permutation Γ Γ' → 
@@ -377,6 +377,7 @@ module SimplyTyped (Name : Set) (_≈_ : Name → Name → Set)(_==_ : (n1 n2 : 
      with perm (z ∶ α ∷ Γ) (z ∶ α ∷ Γ') τ (instantiate-iter t (F z) zero) (p-cons (z ∶ α) [] [] Γ Γ' p-nil permu) der
   perm Γ Γ' .(α ⇒ τ) .(ƛ t) permu (abs {.Γ} {z} {t} α τ y y' der) | cond0 = abs α τ y (dom-perm Γ Γ' z permu y') cond0
 
+  {- BASE perm perm perm-id -}
 
   -- weakening lemma
   weak : ∀ (Γ : Context)(τ α : Type)(t : Term)(x : Name) →
@@ -384,7 +385,12 @@ module SimplyTyped (Name : Set) (_≈_ : Name → Name → Set)(_==_ : (n1 n2 : 
   weak Γ τ α .(F z) x (ass {z} y) = ass (in-drop (x ∶ τ) y)
   weak Γ τ α .(t $ s) x (app {.Γ} {t} {s} τ₁ .α v1 v2 d1 d2) 
     = app τ₁ α v1 v2 (weak Γ τ (τ₁ ⇒ α) t x d1) (weak Γ τ τ₁ s x d2)
-  weak Γ τ .(α ⇒ τ') .(ƛ t) x (abs {.Γ} {z} {t} α τ' y y' der) = {!!} -- permutation lemma needed?
+  weak Γ τ .(α ⇒ τ') .(ƛ t) x (abs {.Γ} {z} {t} α τ' y y' der) with weak (z ∶ α ∷ Γ) τ τ' (instantiate-iter t (F z) zero) x der
+  weak Γ τ .(α ⇒ τ') .(ƛ t) x (abs {.Γ} {z} {t} α τ' y y' der) | cond0 = abs α τ' y {!!} (perm (x ∶ τ ∷ z ∶ α ∷ Γ) (z ∶ α ∷ x ∶ τ ∷ Γ) τ' 
+    (instantiate-iter t (F z) zero) (p-cons (x ∶ τ) (z ∶ α ∷ []) (z ∶ α ∷ []) Γ Γ (perm-id (z ∶ α ∷ [])) (perm-id Γ)) cond0)
+  -- the goal is probably not provable, we need to again look at the abs typing rule...
+
+  {- BASE context perm weak perm-id -}
 
 {-  
 

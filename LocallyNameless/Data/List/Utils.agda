@@ -54,13 +54,18 @@ lem-∈-app a (x ∷ xs) ys cmp (in-drop .x y) | no ¬p with lem-∈-app a xs ys
 lem-∈-app a (x ∷ xs) ys cmp (in-drop .x y) | no ¬p | inj₁ l = inj₁ (in-drop x l)
 lem-∈-app a (x ∷ xs) ys cmp (in-drop .x y) | no ¬p | inj₂ r = inj₂ r
 
-{- BASE in lem-∈-app-l lem-∈-app-r lem-∈-app lem-∈-neq lem-∈-inside lem-∈-extend-l lem-∈-extend-r  -}
+{- BASE in lem-∈-app-l lem-∈-app-r lem-∈-app lem-∈-neq lem-∈-inside lem-∈-extend-l lem-∈-extend-r -}
 
 -- properties of permutations
 data Permutation {A : Set} : (l l2 : List A) → Set where
   p-nil : Permutation [] []
   p-cons : (x : A) (xs xs' ys ys' : List A) → Permutation xs xs' → Permutation ys ys' →
     Permutation (x ∷ (xs ++ ys)) (xs' ++ (x ∷ ys'))
+
+
+perm-id : ∀ {A : Set}(l : List A) → Permutation l l
+perm-id [] = p-nil
+perm-id (x' ∷ xs) = p-cons x' [] [] xs xs p-nil (perm-id xs)
 
 
 perm-in : ∀ {A : Set}(x : A)(l l' : List A) → (cmp : ∀ (a1 a2 : A) → Dec (a1 ≡ a2)) → 
