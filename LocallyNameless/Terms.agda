@@ -14,14 +14,19 @@ open import Relation.Nullary
 
 module Syntax where
 
+  -- we abstract over names
+  -- we only need decidable equality
+  -- and a fresh name generator -- this is not used so far
+
   postulate
     Name : Set
     _≈_ : Name → Name → Set
     _==_ : (n1 n2 : Name) → Dec (n1 ≡ n2)
-  
-  --open Untyped Name _≈_ _==_ 
 
-    -- the type of terms
+
+  -- terms a represented using the locally nameless
+  -- representation
+
   infixl 5 _$_
 
   data Term : Set where
@@ -46,6 +51,7 @@ module Syntax where
   -- abstract takes a name and binds it at the top-most level
   -- i.e. abstract x (λ. 0 x) ==> (λ 0 1) 
   --                         ! it does not wrap it with a ƛ!
+
   abstraction : (z : Name) → (t : Term) → Term
   abstraction z t = abstraction-iter z t 0
 
@@ -63,6 +69,7 @@ module Syntax where
 
   -- instantiate takes a term t that came from ƛ t and replaces all occurences of the
   -- bound variable quantified at the top-most level by the given term s
+
   instantiate : (t s : Term) → Term
   instantiate t s = instantiate-iter t s 0
 
@@ -71,6 +78,7 @@ module Syntax where
   -- when we open a bound variable for a given name (instead of just any term)
   -- in order for this function to be correct, z should be fresh in t
   -- (this precondition will be stated in the theorems and lemmas
+
   var-open-iter : (t : Term) → (z : Name) → (n : ℕ)  → Term
   var-open-iter (B i) z n with i ≟ n
   var-open-iter (B i) z n | yes p = F z
@@ -110,9 +118,11 @@ module Syntax where
   x # t = x ∉ fv t
 
   
-  -- encodings of valid lambda terms
-  -- basically, we want to guarantee that every bound
-  -- variable has a coresponding lambda somewhere up in the term
+  -- we introduce a valid predicate to pick those terms
+  -- in which every bound variable has a corresponing lambda somewhere
+  -- above in the term
+  -- this way we can exclude terms that do not correspond to valid
+  -- lambda terms, ie. ƛ (B 100)
 
   data valid-iter : (t : Term) (n : ℕ) → Set where
     free  : (n : ℕ) (z :     Name) → valid-iter (F z) n
@@ -122,6 +132,7 @@ module Syntax where
 
   valid : (t : Term) → Set
   valid t = valid-iter t 0
+
 
   -- the βη equality
 
@@ -142,6 +153,9 @@ module Syntax where
     η : {t : Term} → ƛ (t $ B 0) ≡βη t
     β : (t s : Term) → (ƛ t) $ s ≡βη instantiate t s
 
+
+  -- the notion of values
+
   data value : (t : Term) → Set where
     abs : (t : Term) → value (ƛ t)
 
@@ -160,10 +174,10 @@ module Syntax where
 -}
 
   -- id t ≡βη t
-  -- derived automatically
 
   lem-apply-id : ∀ (t : Term) → (ƛ (B 0)) $ t ≡βη t
   lem-apply-id t = β (B zero) t
+
 
   -- a function that decides equality must be "reflexive"
   ==-refl : ∀ (x : Name) → x == x ≡ yes refl
@@ -173,6 +187,7 @@ module Syntax where
 
   {- BASE global ⊥-elim cong cong₂ lem-∈-app-l lem-∈-app-r lem-less-means-no lem-≟-refl ==-refl sym -} 
   {- BASE arith lem-≤-trans lem-≤-suc ≤-pred lem-≤-cases-ext -}
+
 
   {- the duality between variable opening and closing in two parts -}
 
@@ -201,6 +216,7 @@ module Syntax where
 
 
   -- having proven the generalizations, we get the main theorems for free
+
   lem-open-then-close : ∀ (t : Term) → (x : Name) → x # t → t ≡ abstraction x (var-open t x)
   lem-open-then-close = lem-open-then-close-iter 0
 
@@ -258,11 +274,11 @@ module Syntax where
 
   {- BASE nameless lem-open-then-close lem-close-then-open lem-subst-alternate lem-abstraction-fresh lem-subst-fresh -}
 
-  -- end of copy pasting
-
+{-
   -------------------------------------
-  -- validness preserving operatations
+    validness preserving operatations
   -------------------------------------
+-}
 
   valid-iter-weak : ∀ (n : ℕ)(t : Term) → valid-iter t n → valid-iter t (suc n)
   valid-iter-weak n .(F z) (free .n z) = free (suc n) z
@@ -281,9 +297,9 @@ module Syntax where
   ... | yes p = ⊥-elim (lem-less-means-no k n y p)
   ... | no ¬p = bound n k y
 
-
   valid-instantiate : ∀ (t s : Term) → valid t → valid s → valid (instantiate t s)
   valid-instantiate = valid-instantiate-iter zero
+
 
   valid-instantiate-iter-suc : ∀ (n : ℕ) (t s : Term) → valid-iter t (suc n) → valid-iter s n → valid-iter (instantiate-iter t s n) n
   valid-instantiate-iter-suc n .(F z) s (free .(suc n) z) val-s = free n z

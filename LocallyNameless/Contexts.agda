@@ -3,6 +3,8 @@ module Contexts where
 open import Data.Empty
 open import Data.List
 open import Data.List.Utils
+{- BASE perm perm-in perm-in-rev  lem-∈-app-l lem-∈-app-r perm-in lem-∈-app lem-∈-neq lem-∈-inside lem-∈-extend-l lem-∈-extend-r -}
+
 open import Data.Nat
 open import Data.Nat.Theorems
 open import Data.Sum
@@ -17,43 +19,50 @@ open Syntax
 
 module TypeTechnicalities where
 
-  ----------------
-  -- simple types
-  ----------------
-
   infixl 40 _,_
   infix  50 _∶_
   infixr 60 _⇒_
 
+  -- simple types
 
   data Type : Set where
     γ : Type
     _⇒_ : (τ1 τ2 : Type) → Type  
 
+
+  -- variable type declaration/assignment
+
   data Assignment : Set where
-    _∶_ : (x : Name) → (τ : Type) → Assignment               -- variable type declaration/assignment
+    _∶_ : (x : Name) → (τ : Type) → Assignment
 
 
   -- for contexts we will use a sugared notation for lists instead
   -- of a seperate datatype to minimalize the number of needed lemmas
+
   Context : Set
   Context = List Assignment
 
   ∅ : Context
   ∅ = []
 
-  _,_ : (Γ : Context) → (j : Assignment) → Context      -- a single assingment with the rest of the context
+  -- a single assingment with the rest of the context
+  _,_ : (Γ : Context) → (j : Assignment) → Context      
   Γ , j = j ∷ Γ
   
+
   -- domain of a context
+
   dom : (Γ : Context) → List Name
   dom [] = []
   dom (x ∶ τ ∷ xs) = x ∷ dom xs
 
   -- well formed contexts
+  -- that is those whose domains form a set
+
   data ok : Context → Set where
     ok-nil  : ok ∅
     ok-cons : (x : Name) (Γ : Context) (τ : Type) → x ∉ dom Γ → ok Γ → ok (Γ , x ∶ τ)
+
 
   -------------------------------------
   --      properties of dom & ok     --
@@ -121,7 +130,7 @@ module TypeTechnicalities where
   postulate
     ass-dec : (a1 a2 : Assignment) → Dec (a1 ≡ a2)
 
-  {- BASE perm perm-in perm-in-rev ass-dec lem-∈-app-l lem-∈-app-r perm-in lem-∈-app lem-∈-neq lem-∈-inside lem-∈-extend-l lem-∈-extend-r -}
+  {- BASE perm ass-dec -}
 
   dom-inv : ∀ (Γ : Context)(z : Name) → z ∈ dom Γ → ∃ (λ τ → z ∶ τ ∈ Γ)
   dom-inv [] z ()
@@ -143,8 +152,6 @@ module TypeTechnicalities where
   dom-perm-rev Γ Γ' z perm z∉dom' z∈dom with dom-inv Γ z z∈dom
   dom-perm-rev Γ Γ' z perm z∉dom' z∈dom | τ ,, inn = z∉dom' (dom-in Γ' z τ (perm-in (z ∶ τ) Γ Γ' ass-dec perm inn))
 
-  
-
   {- BASE perm dom-perm dom-perm-rev -}
 
   postulate
@@ -152,10 +159,9 @@ module TypeTechnicalities where
 
   {- BASE perm perm-ok perm-app -}
 
-
   -- permutations and ok
   dom-ok : ∀ (Γ Γ' : Context) → Permutation Γ Γ' → ok Γ → ok Γ'
   dom-ok .[] .[] p-nil okk = okk
   dom-ok .(x ∶ τ ∷ xs ++ ys) .(xs' ++ x ∶ τ ∷ ys') (p-cons .(x ∶ τ) xs xs' ys ys' y y') (ok-cons x .(xs ++ ys) τ y0 y1) 
-    = lem-ok-app-middle x τ xs' ys' (perm-ok xs xs' ys ys' y y' y1) (λ x' → dom-perm (xs ++ ys) (xs' ++ ys') x (perm-app xs xs' ys ys' y y') y0
-                                                                              x')
+    = lem-ok-app-middle x τ xs' ys' (perm-ok xs xs' ys ys' y y' y1) 
+      (λ x' → dom-perm (xs ++ ys) (xs' ++ ys') x (perm-app xs xs' ys ys' y y') y0 x')
