@@ -18,6 +18,13 @@ a ∉ l = ¬ (a ∈ l)
 
 {- BASE global ⊥-elim cong cong₂ -}
 
+lem-∈-eq : ∀ {A : Set} (a a' : A)(xs : List A) → a ≡ a' → a ∈ a' ∷ xs
+lem-∈-eq .a' a' xs refl = in-keep a' xs
+
+lem-∉-neq-tail : ∀ {A : Set} (a a' : A)(xs : List A) → a ≢ a' → a ∉ xs → a ∉ (a' ∷ xs)
+lem-∉-neq-tail .a' a' xs neq a∉xs (in-keep .a' .xs) = neq refl
+lem-∉-neq-tail a a' xs neq a∉xs (in-drop .a' y) = a∉xs y
+
 -- extension lemmas
 
 lem-∈-extend-l : ∀ {A : Set} (a : A)(xs ys : List A) → a ∈ xs → a ∈ ys ++ xs
@@ -114,8 +121,19 @@ perm-swap x y l1 l2 (p-trans .l1 l3 .l2 y' y0) = p-trans (x ∷ y ∷ l1) (y ∷
                                                    (perm-swap x y l1 l3 y')
                                                    (p-cons y (x ∷ l3) (x ∷ l2) (p-cons x l3 l2 y0)) 
 
-{- BASE perm perm-swap -}
 
+perm-nil : ∀ {A : Set}(l : List A) → Permutation [] l → l ≡ []
+perm-nil [] perm = refl
+perm-nil (x ∷ xs) (p-trans .[] l2 .(x ∷ xs) y y') rewrite (perm-nil l2 y) = perm-nil (x ∷ xs) y' 
+
+{- BASE perm perm-swap perm-nil -}
+
+postulate
+  perm-app : ∀ {A : Set}(xs xs' ys ys' : List A) → Permutation xs xs' → Permutation ys ys' → Permutation (xs ++ ys) (xs' ++ ys')
+
+
+{- the following proof typechecks, but may not be terminating -}
+{-
 perm-app : ∀ {A : Set}(xs xs' ys ys' : List A) → Permutation xs xs' → Permutation ys ys' → Permutation (xs ++ ys) (xs' ++ ys')
 perm-app .[] .[] ys ys' p-nil perm-ys' = perm-ys'
 perm-app .(x ∷ xs) .(x ∷ xs') ys ys' (p-cons x xs xs' y) perm-ys' = p-cons x (xs ++ ys) (xs' ++ ys')
@@ -127,5 +145,6 @@ perm-app xs xs' ys ys' (p-trans .xs l2 .xs' y y') perm-ys' = p-trans ((xs ++ ys)
 
   p2 : Permutation (l2 ++ ys') (xs' ++ ys')
   p2 = perm-app l2 xs' ys' ys' y' (perm-id ys')
+-}
 
 {- BASE perm perm-app -}

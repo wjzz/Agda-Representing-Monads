@@ -99,6 +99,7 @@ module TypeTechnicalities where
 
   {- BASE dom lem-dom-app-inv-l lem-dom-app-inv-r lem-dom-app-inv lem-dom-not-head -}
 
+   
   lem-ok-app-inv-l : ∀ (xs ys : Context) → ok (xs ++ ys) → ok xs
   lem-ok-app-inv-l [] ts okk = ok-nil
   lem-ok-app-inv-l (.(x ∶ τ) ∷ xs) ts (ok-cons x .(xs ++ ts) τ y y') = ok-cons x xs τ (lem-dom-app-inv-l x xs ts y) (lem-ok-app-inv-l xs ts y')
@@ -122,15 +123,43 @@ module TypeTechnicalities where
       ... | cond0 = lem-dom-app-inv-r x' xs ys y cond0
 
   {- BASE dom lem-ok-app-middle -}
+  
+  --------------------------------------------------
+  -- decidable comparisons on types and assignments
+  --------------------------------------------------
+
+  lem-type-dec : (τ1 τ2 τ3 τ4 : Type) → (τ1 ⇒ τ3 ≡ τ2 ⇒ τ4) → τ1 ≡ τ2 × τ3 ≡ τ4
+  lem-type-dec .τ2 τ2 .τ4 τ4 refl = refl ,, refl  
+  
+  {- BASE type lem-type-dec -}
+
+  type-dec : (τ₁ τ₂ : Type) → Dec (τ₁ ≡ τ₂)
+  type-dec γ γ = yes refl
+  type-dec γ (τ1 ⇒ τ2) = no (λ ())
+  type-dec (τ1 ⇒ τ2) γ = no (λ ())
+  type-dec (τ1 ⇒ τ2) (τ3 ⇒ τ4) with type-dec τ1 τ3
+  type-dec (τ1 ⇒ τ2) (τ3 ⇒ τ4) | yes p with type-dec τ2 τ4
+  type-dec (τ1 ⇒ τ2) (τ3 ⇒ τ4) | yes p | yes p2 rewrite p | p2 = yes refl
+  type-dec (τ1 ⇒ τ2) (τ3 ⇒ τ4) | yes p | no ¬p rewrite p = no (λ x → ¬p (proj₂ (lem-type-dec τ3 τ3 τ2 τ4 x)))
+  type-dec (τ1 ⇒ τ2) (τ3 ⇒ τ4) | no ¬p = no (λ x → ¬p (proj₁ (lem-type-dec τ1 τ3 τ2 τ4 x)))
+
+  lem-ass-dec : (x1 x2 : Name)(τ1 τ2 : Type) → (x1 ∶ τ1 ≡ x2 ∶ τ2) → x1 ≡ x2 × τ1 ≡ τ2
+  lem-ass-dec .x2 x2 .τ2 τ2 refl = refl ,, refl  
+
+  {- BASE ass lem-ass-dec -}    
+
+  ass-dec : (a1 a2 : Assignment) → Dec (a1 ≡ a2)
+  ass-dec (x ∶ τ) (x' ∶ τ') with x == x'
+  ass-dec (x ∶ τ) (x' ∶ τ') | yes p with type-dec τ τ'
+  ass-dec (x ∶ τ) (x' ∶ τ') | yes p' | yes p rewrite p' | p = yes refl
+  ass-dec (x ∶ τ) (x' ∶ τ') | yes p  | no ¬p = no (λ x0 → ¬p (proj₂ (lem-ass-dec x x' τ τ' x0)))
+  ass-dec (x ∶ τ) (x' ∶ τ') | no ¬p = no (λ x0 → ¬p (proj₁ (lem-ass-dec x x' τ τ' x0)))
+
+  {- BASE perm ass-dec -}
 
   ------------------------------
   -- properties of permutations
   ------------------------------
-
-  postulate
-    ass-dec : (a1 a2 : Assignment) → Dec (a1 ≡ a2)
-
-  {- BASE perm ass-dec -}
 
   dom-inv : ∀ (Γ : Context)(z : Name) → z ∈ dom Γ → ∃ (λ τ → z ∶ τ ∈ Γ)
   dom-inv [] z ()
@@ -152,16 +181,22 @@ module TypeTechnicalities where
   dom-perm-rev Γ Γ' z perm z∉dom' z∈dom with dom-inv Γ z z∈dom
   dom-perm-rev Γ Γ' z perm z∉dom' z∈dom | τ ,, inn = z∉dom' (dom-in Γ' z τ (perm-in (z ∶ τ) Γ Γ' ass-dec perm inn))
 
-  {- BASE perm dom-perm dom-perm-rev -}
-
-  postulate
-    perm-ok : (xs xs' ys ys' : Context) → Permutation xs xs' → Permutation ys ys' → ok (xs ++ ys) → ok (xs' ++ ys')
-
-  {- BASE perm perm-ok perm-app -}
+  {- BASE perm dom-perm dom-perm-rev perm-app -}
 
   -- permutations and ok
   dom-ok : ∀ (Γ Γ' : Context) → Permutation Γ Γ' → ok Γ → ok Γ'
-  dom-ok .[] .[] p-nil okk = okk
-  dom-ok .(x ∶ τ ∷ xs ++ ys) .(xs' ++ x ∶ τ ∷ ys') (p-cons .(x ∶ τ) xs xs' ys ys' y y') (ok-cons x .(xs ++ ys) τ y0 y1) 
-    = lem-ok-app-middle x τ xs' ys' (perm-ok xs xs' ys ys' y y' y1) 
-      (λ x' → dom-perm (xs ++ ys) (xs' ++ ys') x (perm-app xs xs' ys ys' y y') y0 x')
+  dom-ok .[] Γ' (p-trans .[] l2 .Γ' y y') ok-nil rewrite perm-nil l2 y | perm-nil Γ' y' = ok-nil
+  dom-ok .(x ∶ τ ∷ Γ) Γ' (p-trans .(x ∶ τ ∷ Γ) l2 .Γ' y y') (ok-cons x Γ τ y0 y1) = dom-ok l2 Γ' y' l2-ok where
+    l2-ok : ok l2
+    l2-ok = dom-ok (x ∶ τ ∷ Γ) l2 y (ok-cons x Γ τ y0 y1)
+  dom-ok .[] .[] p-nil okΓ = okΓ
+  dom-ok .(x ∶ τ ∷ xs) .(x ∶ τ ∷ xs') (p-cons .(x ∶ τ) xs xs' y) (ok-cons x .xs τ y' y0) 
+    = ok-cons x xs' τ (dom-perm xs xs' x y y') (dom-ok xs xs' y y0)
+  dom-ok .(x ∶ τ ∷ x' ∶ τ' ∷ l) .(x' ∶ τ' ∷ x ∶ τ ∷ l) (p-swap .(x ∶ τ) .(x' ∶ τ') l) (ok-cons x .(x' ∶ τ' ∷ l) τ y' 
+        (ok-cons x' .l τ' y y0)) = ok-cons x' (x ∶ τ ∷ l) τ' (lem-∉-neq-tail x' x ((dom l)) (λ x0 → x≢x' (sym x0)) y) 
+        (ok-cons x l τ x∉l y0) where
+   x≢x' : x ≢ x'
+   x≢x' x0 = y' (lem-∈-eq x x' (dom l) x0)
+   x∉l : x ∉ dom l
+   x∉l = λ x0 → y' (in-drop x' x0)  
+
