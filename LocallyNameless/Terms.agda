@@ -334,5 +334,19 @@ module Syntax where
   ... | yes p = val-s
   ... | no ¬p = bound n k (lem-≤-cases-ext k n (≤-pred y) ¬p)
 
+  valid-subst-iter : ∀ (n : ℕ) (t s : Term)(x : Name) → valid-iter t n → valid-iter s n → valid-iter (t [ x ↦ s ]) n
+  valid-subst-iter n (B i) s x val-t val-s = val-t
+  valid-subst-iter n (F z) s x val-t val-s with x == z
+  valid-subst-iter n (F z) s x val-t val-s | yes p = val-s
+  valid-subst-iter n (F z) s x val-t val-s | no ¬p = val-t
+  valid-subst-iter n (t1 $ t2) s x (app .t1 .t2 v1 v2) val-s 
+    = app (t1 [ x ↦ s ]) (t2 [ x ↦ s ]) (valid-subst-iter n t1 s x v1 val-s) (valid-subst-iter n t2 s x v2 val-s)
+  valid-subst-iter n (ƛ t) s x (abs .t y) val-s = abs (t [ x ↦ s ]) (valid-subst-iter (suc n) t s x y (valid-iter-weak n s val-s))  
 
-  {- BASE valid valid-iter-weak valid-instantiate valid-instantiate-iter-suc -}
+
+  valid-subst : ∀ (t s : Term)(x : Name) → valid t → valid s → valid (t [ x ↦ s ])
+  valid-subst = valid-subst-iter zero
+
+  {- BASE valid valid-subst valid-iter-weak valid-instantiate valid-instantiate-iter-suc -}
+
+  

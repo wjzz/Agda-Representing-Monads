@@ -137,16 +137,51 @@ module SimplyTyped where
   progress .(t $ s) τ val (app {.[]} {t} {s} τ₁ .τ v1 v2 o d1 d2) | inj₂ prog-t = inj₂ (proj₁ prog-t $ s ,, app-f (proj₂ prog-t))
 
 
+  -- two lemmas needed to prove lem-subst
 
-  lem-assingment-neq : ∀ (x1 x2 : Name)(τ1 τ2 : Type) → x1 ≢ x2 → x1 ∶ τ1 ≢ x2 ∶ τ2
-  lem-assingment-neq .x2 x2 .τ2 τ2 neq refl = neq refl
+  lem-assignment-neq : ∀ (x1 x2 : Name)(τ1 τ2 : Type) → x1 ≢ x2 → x1 ∶ τ1 ≢ x2 ∶ τ2
+  lem-assignment-neq .x2 x2 .τ2 τ2 neq refl = neq refl
 
+  lem-assignment-uniqness : ∀ (Γ : Context) (z : Name)(τ α : Type) → z ∶ τ ∈ z ∶ α ∷ Γ → z ∉ dom Γ → τ ≡ α
+  lem-assignment-uniqness Γ z .α α (in-keep .(z ∶ α) .Γ) z∉Γ = refl
+  lem-assignment-uniqness Γ z τ α (in-drop .(z ∶ α) y) z∉Γ = ⊥-elim (z∉Γ (dom-in Γ z τ y))  
+
+  {- BASE perm lem-assignment-neq lem-assignment-uniqness -}
 
   -- the substitution lemma
 
-  lem-subst : ∀ (Γ : Context)(x : Name)(α τ : Type)(t t2 : Term) → 
+  lem-subst : ∀ (Γ : Context)(x : Name)(α τ : Type)(t t2 : Term) → valid t2 →
               Γ , x ∶ α ⊢ t ∶ τ   → Γ ⊢ t2 ∶ α   → Γ ⊢ t [ x ↦ t2 ] ∶ τ
-  lem-subst = {!!}
+  lem-subst Γ x α τ (B i) t2 val-t2 () der-t2
+  lem-subst Γ x α τ (F z) t2 val-t2 (ass y y') der-t2 with x == z
+  lem-subst Γ x α τ (F z) t2 val-t2 (ass (ok-cons .x .Γ .α x∉Γ okΓ) y') der-t2 | yes p 
+     rewrite p with lem-assignment-uniqness Γ z τ α y' x∉Γ
+  ... | types-eq rewrite types-eq = der-t2
+  lem-subst Γ x α τ (F z) t2 val-t2 (ass (ok-cons .x .Γ .α x∉Γ okΓ) y') der-t2 | no ¬p =
+    ass okΓ (lem-∈-neq (z ∶ τ) (x ∶ α) Γ (lem-assignment-neq z x τ α (λ x' → ¬p (sym x'))) y')
+  lem-subst Γ x α τ (t1 $ t2) t3 val-t2 (app τ₁ .τ v1 v2 (ok-cons .x .Γ .α y y') d1 d2) der-t2 
+     = app τ₁ τ (valid-subst t1 t3 x v1 val-t2) (valid-subst t2 t3 x v2 val-t2) y' 
+                (lem-subst Γ x α (τ₁ ⇒ τ) t1 t3 val-t2 d1 der-t2) (lem-subst Γ x α τ₁ t2 t3 val-t2 d2 der-t2)
+  lem-subst Γ x α .(α' ⇒ τ) (ƛ t) t2 val-t2 (abs α' τ (ok-cons .x .Γ .α y y') y0) der-t2 = abs α' τ y' lem where
+    lem : (z : Name) → (z ∉ fv (t [ x ↦ t2 ])) → (z ∉ dom Γ) → (z ∶ α' ∷ Γ) ⊢ instantiate-iter (t [ x ↦ t2 ]) (F z) 0 ∶ τ
+    lem z z∉fv z∉Γ = {!!}  
+
+  -- another lemma needed?
+
+{-
+Goal: (z ∶ α' ∷ Γ) ⊢ instantiate-iter (t [ x ↦ t2 ]) (F z) 0 ∶ τ
+————————————————————————————————————————————————————————————
+z∉Γ    : z ∈ dom Γ → ⊥
+z∉fv   : z ∈ fv (t [ x ↦ t2 ]) → ⊥
+z      : Name
+der-t2 : Γ ⊢ t2 ∶ α
+y0     : (z' : Name) →
+         (z' ∈ fv t → ⊥) →
+         (z' ∈ x ∷ dom Γ → ⊥) →
+         (z' ∶ α' ∷ x ∶ α ∷ Γ) ⊢ instantiate-iter t (F z') 0 ∶ τ
+y'     : ok Γ
+y      : x ∈ dom Γ → ⊥
+-}
 
 
   -- beta reduction and typing
