@@ -128,7 +128,14 @@ module SimplyTyped where
   -- the progress lemma
 
   progress : ∀ (t : Term) (τ : Type) → valid t → ∅ ⊢ t ∶ τ → value t ⊎ ∃ (λ t' → t ⟶β t')
-  progress = {!!}
+  progress .(F z) τ val (ass {z} y ())
+  progress .(ƛ t) .(α ⇒ τ) val (abs {.[]} {t} α τ y y') = inj₁ (abs t)  
+  progress .(t $ s) τ val (app {.[]} {t} {s} τ₁ .τ v1 v2 o d1 d2) with progress t (τ₁ ⇒ τ) v1 d1
+  progress .((ƛ t) $ s) τ val (app {.[]} {.(ƛ t)} {s} τ₁ .τ v1 v2 o d1 d2) | inj₁ (abs t) with progress s τ₁ v2 d2
+  ... | inj₁ val-s  = inj₂ (instantiate-iter t s zero ,, β val-s)
+  ... | inj₂ prog-s = inj₂ (ƛ t $ proj₁ prog-s ,, app-a (abs t) (proj₂ prog-s))
+  progress .(t $ s) τ val (app {.[]} {t} {s} τ₁ .τ v1 v2 o d1 d2) | inj₂ prog-t = inj₂ (proj₁ prog-t $ s ,, app-f (proj₂ prog-t))
+
 
 
   lem-assingment-neq : ∀ (x1 x2 : Name)(τ1 τ2 : Type) → x1 ≢ x2 → x1 ∶ τ1 ≢ x2 ∶ τ2
