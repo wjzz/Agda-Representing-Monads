@@ -58,58 +58,68 @@ lem-∈-app a (x ∷ xs) ys cmp (in-drop .x y) | no ¬p | inj₂ r = inj₂ r
 {- BASE in lem-∈-app-l lem-∈-app-r lem-∈-app lem-∈-neq lem-∈-inside lem-∈-extend-l lem-∈-extend-r -}
 
 -- properties of permutations
-data Permutation {A : Set} : (l l2 : List A) → Set where
-  p-nil : Permutation [] []
-  p-cons : (x : A) (xs xs' ys ys' : List A) → Permutation xs xs' → Permutation ys ys' →
-    Permutation (x ∷ (xs ++ ys)) (xs' ++ (x ∷ ys'))
+
+data Permutation {A : Set} : (l1 l2 : List A) → Set where
+  p-nil   : Permutation [] []
+  p-cons  : (x : A) (xs xs' : List A) → Permutation xs xs' → Permutation (x ∷ xs) (x ∷ xs')
+  p-swap  : (x y : A)(l : List A) → Permutation (x ∷ y ∷ l) (y ∷ x ∷ l)
+  p-trans : (l1 l2 l3 : List A) → Permutation l1 l2 → Permutation l2 l3 → Permutation l1 l3
 
 
 perm-id : ∀ {A : Set}(l : List A) → Permutation l l
 perm-id [] = p-nil
-perm-id (x' ∷ xs) = p-cons x' [] [] xs xs p-nil (perm-id xs)
+perm-id (x ∷ xs) = p-cons x xs xs (perm-id xs)
 
 
 perm-in : ∀ {A : Set}(x : A)(l l' : List A) → (cmp : ∀ (a1 a2 : A) → Dec (a1 ≡ a2)) → 
           Permutation l l' →  x ∈ l → x ∈ l'
 perm-in x .[] .[] cmp p-nil x∈l = x∈l
-perm-in x .(x' ∷ xs ++ ys) .(xs' ++ x' ∷ ys') cmp (p-cons x' xs xs' ys ys' y y') x∈l with cmp x x'
-perm-in x .(x' ∷ xs ++ ys) .(xs' ++ x' ∷ ys') cmp (p-cons x' xs xs' ys ys' y y') x∈l | yes p rewrite p = lem-∈-inside x' xs' ys'
-perm-in x .(x' ∷ xs ++ ys) .(xs' ++ x' ∷ ys') cmp (p-cons x' xs xs' ys ys' y y') x∈l | no ¬p with lem-∈-app x xs ys cmp (lem-∈-neq x x' (xs ++ ys) ¬p x∈l)
-perm-in x .(x' ∷ xs ++ ys) .(xs' ++ x' ∷ ys') cmp (p-cons x' xs xs' ys ys' y y') x∈l | no ¬p | inj₁ l with perm-in x xs xs' cmp y l
-perm-in x .(x' ∷ xs ++ ys) .(xs' ++ x' ∷ ys') cmp (p-cons x' xs xs' ys ys' y y') x∈l | no ¬p | inj₁ l | rec 
-  = lem-∈-extend-r x xs' (x' ∷ ys') rec
-perm-in x .(x' ∷ xs ++ ys) .(xs' ++ x' ∷ ys') cmp (p-cons x' xs xs' ys ys' y y') x∈l | no ¬p | inj₂ r with perm-in x ys ys' cmp y' r
-perm-in x .(x' ∷ xs ++ ys) .(xs' ++ x' ∷ ys') cmp (p-cons x' xs xs' ys ys' y y') x∈l | no ¬p | inj₂ r | rec 
-  = lem-∈-extend-l x (x' ∷ ys') xs' (in-drop x' rec)
+perm-in .x' .(x' ∷ xs) .(x' ∷ xs') cmp (p-cons x' xs xs' y) (in-keep .x' .xs) = in-keep x' xs'
+perm-in x .(x' ∷ xs) .(x' ∷ xs') cmp (p-cons x' xs xs' y) (in-drop .x' y') = in-drop x' (perm-in x xs xs' cmp y y')
+perm-in .x' .(x' ∷ y ∷ l) .(y ∷ x' ∷ l) cmp (p-swap x' y l) (in-keep .x' .(y ∷ l)) = in-drop y (in-keep x' l)
+perm-in .y .(x' ∷ y ∷ l) .(y ∷ x' ∷ l) cmp (p-swap x' y l) (in-drop .x' (in-keep .y .l)) = in-keep y (x' ∷ l)
+perm-in x .(x' ∷ y ∷ l) .(y ∷ x' ∷ l) cmp (p-swap x' y l) (in-drop .x' (in-drop .y y')) = in-drop y (in-drop x' y')
+perm-in x l l' cmp (p-trans .l l2 .l' y y') x∈l = perm-in x l2 l' cmp y' (perm-in x l l2 cmp y x∈l)
+
 
 perm-in-rev : ∀ {A : Set}(x : A)(l l' : List A) → (cmp : ∀ (a1 a2 : A) → Dec (a1 ≡ a2)) → 
                Permutation l l' →  x ∈ l' → x ∈ l
-perm-in-rev x .[] .[] cmp p-nil x∈l' = x∈l'
-perm-in-rev x .(x' ∷ xs ++ ys) .(xs' ++ x' ∷ ys') cmp (p-cons x' xs xs' ys ys' y y') x∈l' with lem-∈-app x xs' (x' ∷ ys') cmp x∈l'
-perm-in-rev x .(x' ∷ xs ++ ys) .(xs' ++ x' ∷ ys') cmp (p-cons x' xs xs' ys ys' y y') x∈l' | inj₁ l 
-  = in-drop x' (lem-∈-extend-r x xs ys (perm-in-rev x xs xs' cmp y l))
-perm-in-rev x .(x ∷ xs ++ ys) .(xs' ++ x ∷ ys') cmp (p-cons .x xs xs' ys ys' y y') x∈l'   | inj₂ (in-keep .x .ys') 
-  = in-keep x (xs ++ ys)
-perm-in-rev x .(x' ∷ xs ++ ys) .(xs' ++ x' ∷ ys') cmp (p-cons x' xs xs' ys ys' y y') x∈l' | inj₂ (in-drop .x' z) 
-  = in-drop x' (lem-∈-extend-l x ys xs (perm-in-rev x ys ys' cmp y' z))
+perm-in-rev x .[] .[] x' p-nil x1 = x1
+perm-in-rev .x0 .(x0 ∷ xs) .(x0 ∷ xs') x' (p-cons x0 xs xs' y) (in-keep .x0 .xs') = in-keep x0 xs
+perm-in-rev x .(x0 ∷ xs) .(x0 ∷ xs') x' (p-cons x0 xs xs' y) (in-drop .x0 y') = in-drop x0 (perm-in-rev x xs xs' x' y y')
+perm-in-rev .y .(x0 ∷ y ∷ l) .(y ∷ x0 ∷ l) x' (p-swap x0 y l) (in-keep .y .(x0 ∷ l)) = in-drop x0 (in-keep y l)
+perm-in-rev .x0 .(x0 ∷ y ∷ l) .(y ∷ x0 ∷ l) x' (p-swap x0 y l) (in-drop .y (in-keep .x0 .l)) = in-keep x0 (y ∷ l)
+perm-in-rev x .(x0 ∷ y ∷ l) .(y ∷ x0 ∷ l) x' (p-swap x0 y l) (in-drop .y (in-drop .x0 y')) = in-drop x0 (in-drop y y')
+perm-in-rev x l l' x' (p-trans .l l2 .l' y y') x1 = perm-in-rev x l l2 x' y (perm-in-rev x l2 l' x' y' x1)
 
 {- BASE in perm-in perm-in-rev -}
 
-postulate
-  perm-trans : ∀ {A : Set} (xs ys zs : List A) → Permutation xs ys → Permutation ys zs → Permutation xs zs
-{-
-perm-trans .[] .[] zs p-nil p2 = p2
-perm-trans .(x ∷ xs ++ ys) .(xs' ++ x ∷ ys') zs (p-cons x xs xs' ys ys' y y') p2 = {!!}
--}
+perm-swap : ∀ {A : Set}(x y : A)(l1 l2 : List A) → Permutation l1 l2 → Permutation (x ∷ y ∷ l1) (y ∷ x ∷ l2)
+perm-swap x y .[] .[] p-nil = p-swap x y []
+perm-swap x y .(x' ∷ xs) .(x' ∷ xs') (p-cons x' xs xs' y') = p-trans (x ∷ y ∷ x' ∷ xs) (y ∷ x ∷ x' ∷ xs) (y ∷ x ∷ x' ∷ xs')
+                                                               (p-swap x y (x' ∷ xs))
+                                                               (p-cons y (x ∷ x' ∷ xs) (x ∷ x' ∷ xs')
+                                                                (p-cons x (x' ∷ xs) (x' ∷ xs') (p-cons x' xs xs' y')))
+perm-swap x y .(x' ∷ y' ∷ l) .(y' ∷ x' ∷ l) (p-swap x' y' l) = p-trans (x ∷ y ∷ x' ∷ y' ∷ l) (y ∷ x ∷ x' ∷ y' ∷ l)
+                                                                 (y ∷ x ∷ y' ∷ x' ∷ l) (p-swap x y (x' ∷ y' ∷ l))
+                                                                 (p-cons y (x ∷ x' ∷ y' ∷ l) (x ∷ y' ∷ x' ∷ l)
+                                                                  (p-cons x (x' ∷ y' ∷ l) (y' ∷ x' ∷ l) (p-swap x' y' l)))
+perm-swap x y l1 l2 (p-trans .l1 l3 .l2 y' y0) = p-trans (x ∷ y ∷ l1) (y ∷ x ∷ l3) (y ∷ x ∷ l2)
+                                                   (perm-swap x y l1 l3 y')
+                                                   (p-cons y (x ∷ l3) (x ∷ l2) (p-cons x l3 l2 y0)) 
 
-postulate
-  perm-app : ∀ {A : Set}(xs xs' ys ys' : List A) → Permutation xs xs' → Permutation ys ys' → Permutation (xs ++ ys) (xs' ++ ys')
+{- BASE perm perm-swap perm-id -}
 
-{-
+perm-app : ∀ {A : Set}(xs xs' ys ys' : List A) → Permutation xs xs' → Permutation ys ys' → Permutation (xs ++ ys) (xs' ++ ys')
+perm-app .[] .[] ys ys' p-nil perm-ys' = perm-ys'
+perm-app .(x ∷ xs) .(x ∷ xs') ys ys' (p-cons x xs xs' y) perm-ys' = p-cons x (xs ++ ys) (xs' ++ ys')
+                                                                      (perm-app xs xs' ys ys' y perm-ys')
+perm-app .(x ∷ y ∷ l) .(y ∷ x ∷ l) ys ys' (p-swap x y l) perm-ys' = perm-swap x y (l ++ ys) (l ++ ys') (perm-app l l ys ys' (perm-id l) perm-ys')
+perm-app xs xs' ys ys' (p-trans .xs l2 .xs' y y') perm-ys' = p-trans ((xs ++ ys)) ((l2 ++ ys')) ((xs' ++ ys')) p1 p2 where
+  p1 : Permutation (xs ++ ys) (l2 ++ ys')
+  p1 = perm-app xs l2 ys ys' y perm-ys'  
 
-perm-app [] .[] ys ys' p-nil p2' = p2'
-perm-app (x ∷ .(xs ++ ys0)) .(xs' ++ x ∷ ys1) ys ys' (p-cons .x xs xs' ys0 ys1 y y') p2' rewrite sym (T.lem-app-assoc (x ∷ xs) ys0 ys)
-  = {!perm-trans  !} where
-    lem : Permutation (x ∷ xs ++ ys0 ++ ys) (x ∷ xs' ++ ys1 ++ ys')
-    lem = perm-app (x ∷ xs) (x ∷ xs') (ys0 ++ ys) (ys1 ++ ys') (p-cons x [] [] xs xs' p-nil y) (perm-app ys0 ys1 ys ys' y' p2')
--}
+  p2 : Permutation (l2 ++ ys') (xs' ++ ys')
+  p2 = perm-app l2 xs' ys' ys' y' (perm-id ys')
+
+{- BASE perm perm-app -}
