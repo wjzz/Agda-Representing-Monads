@@ -25,6 +25,10 @@ lem-∉-neq-tail : ∀ {A : Set} (a a' : A)(xs : List A) → a ≢ a' → a ∉ 
 lem-∉-neq-tail .a' a' xs neq a∉xs (in-keep .a' .xs) = neq refl
 lem-∉-neq-tail a a' xs neq a∉xs (in-drop .a' y) = a∉xs y
 
+lem-∉-cons : ∀ {A : Set} (a a' : A)(xs : List A) → a ∉ (a' ∷ xs) → a ≢ a'
+lem-∉-cons a a' xs x eq rewrite eq = x (in-keep a' xs)
+
+
 -- extension lemmas
 
 lem-∈-extend-l : ∀ {A : Set} (a : A)(xs ys : List A) → a ∈ xs → a ∈ ys ++ xs

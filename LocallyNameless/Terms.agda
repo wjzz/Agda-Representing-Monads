@@ -223,6 +223,28 @@ module Syntax where
   lem-close-then-open : ∀ (t : Term) → (x : Name) → valid t → t ≡ var-open (abstraction x t) x
   lem-close-then-open = lem-close-then-open-iter 0
 
+  -- instantiation to a free variable extends the set exactly by it
+
+  {- BASE in lem-∈-app-l lem-∈-app-r lem-∈-app lem-∈-neq lem-∈-inside lem-∈-extend-l lem-∈-extend-r perm-in perm-in-rev -}
+
+
+  lem-instantiate-fresh-iter : ∀ (n : ℕ) (t : Term) (x z : Name) → x ∉ fv t → x ≢ z → x ∉ fv (instantiate-iter t (F z) n)
+  lem-instantiate-fresh-iter n (B i) x z x∉fv x≢z x∈fv-inst with i ≟ n
+  lem-instantiate-fresh-iter n (B i) .z z x∉fv x≢z (in-keep .z .[]) | yes p = x≢z refl
+  lem-instantiate-fresh-iter n (B i) x z  x∉fv x≢z (in-drop .z y)   | yes p = x∉fv y
+  lem-instantiate-fresh-iter n (B i) x z x∉fv x≢z x∈fv-inst | no ¬p = x∉fv x∈fv-inst
+  lem-instantiate-fresh-iter n (F z) x z' x∉fv x≢z x∈fv-inst = x∉fv x∈fv-inst
+  lem-instantiate-fresh-iter n (t1 $ t2) x z x∉fv x≢z x∈fv-inst 
+     with lem-∈-app x (fv (instantiate-iter t1 (F z) n)) (fv (instantiate-iter t2 (F z) n)) _==_ x∈fv-inst
+  lem-instantiate-fresh-iter n (t1 $ t2) x z x∉fv x≢z x∈fv-inst | inj₁ l 
+     = lem-instantiate-fresh-iter n t1 x z (λ x' → x∉fv (lem-∈-extend-r x (fv t1) (fv t2) x')) x≢z l
+  lem-instantiate-fresh-iter n (t1 $ t2) x z x∉fv x≢z x∈fv-inst | inj₂ r 
+     = lem-instantiate-fresh-iter n t2 x z (λ x' → x∉fv (lem-∈-extend-l x (fv t2) (fv t1) x')) x≢z r
+  lem-instantiate-fresh-iter n (ƛ t) x z x∉fv x≢z x∈fv-inst = lem-instantiate-fresh-iter (suc n) t x z x∉fv x≢z x∈fv-inst
+  
+  lem-instantiate-fresh : ∀ (t : Term) (x z : Name) → x ∉ fv t → x ≢ z → x ∉ fv (instantiate t (F z))
+  lem-instantiate-fresh = lem-instantiate-fresh-iter zero
+
 
   -- substitution on a fresh variable doesn't change the term
 

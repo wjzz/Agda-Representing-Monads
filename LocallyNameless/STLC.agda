@@ -88,28 +88,41 @@ module SimplyTyped where
   -- postulate
   -- P xs xs' → P ys ys' → ok (x :: xs ++ ys) → ok (x :: xs' ++ ys')
   -- P xs xs' → P (x : xs) → P (x : ys')
-
+  
+  {- BASE dom dom-ok lem-dom-app-inv-l lem-dom-app-inv-r lem-dom-app-inv lem-dom-not-head lem-ok-app-inv-l lem-ok-app-inv-r -}
+  {- BASE perm lem-∉-cons perm-in perm-in-rev lem-∈-app-l lem-∈-app-r perm-in lem-∈-app lem-∈-neq lem-∈-inside -}
+  {- BASE perm lem-∈-extend-l lem-∈-extend-r ass-dec dom-inv dom-in dom-perm dom-perm-rev perm-app -}
 
   -- context permutation lemma
 
   perm : ∀ (Γ Γ' : Context)(τ : Type)(t : Term) → Permutation Γ Γ' → 
          Γ ⊢ t ∶ τ   →    Γ' ⊢ t ∶ τ
-  perm .[] .[] τ t p-nil der = der
-  perm .(x ∷ xs ++ ys) .(xs' ++ x ∷ ys') τ .(F z) (p-cons x xs xs' ys ys' y y') (ass {z} y0 y1) 
-    = ass (dom-ok (x ∷ xs ++ ys) (xs' ++ x ∷ ys') (p-cons x xs xs' ys ys' y y') y0) 
-      (perm-in (z ∶ τ) (x ∷ xs ++ ys) (xs' ++ x ∷ ys') ass-dec (p-cons x xs xs' ys ys' y y') y1)
-  perm .(x ∷ xs ++ ys) .(xs' ++ x ∷ ys') τ .(t $ s) (p-cons x xs xs' ys ys' y y') (app {.(x ∷ xs ++ ys)} {t} {s} τ₁ .τ v1 v2 o d1 d2) 
-    = {!!}
-  perm .(x ∶ τ' ∷ xs ++ ys) .(xs' ++ x ∶ τ' ∷ ys') .(α ⇒ τ) .(ƛ t) (p-cons .(x ∶ τ') xs xs' ys ys' y y') (abs {.(x ∶ τ' ∷ xs ++ ys)} {t} α τ 
-    (ok-cons x .(xs ++ ys) τ' y0 y1) y2) = abs α τ (dom-ok (x ∶ τ' ∷ xs' ++ ys') (xs' ++ x ∶ τ' ∷ ys') 
-      (p-cons (x ∶ τ') xs' xs' ys' ys' (perm-id xs') (perm-id ys')) {!!}) (λ z z∉t z∉dom → {!!})
+  perm Γ Γ' τ .(F z) perm (ass {z} y y') = ass (dom-ok Γ Γ' perm y) (perm-in (z ∶ τ) Γ Γ' ass-dec perm y')
+  perm Γ Γ' τ .(t $ s) permu (app {.Γ} {t} {s} τ₁ .τ v1 v2 o d1 d2) = app τ₁ τ v1 v2 (dom-ok Γ Γ' permu o) 
+      (perm Γ Γ' (τ₁ ⇒ τ) t permu d1) (perm Γ Γ' τ₁ s permu d2)
+  perm Γ Γ' .(α ⇒ τ) .(ƛ t) permu (abs {.Γ} {t} α τ y y') = abs α τ (dom-ok Γ Γ' permu y) lem where
+    lem : (z : Name) → (z ∉ fv t) → (z ∉ dom Γ') → (z ∶ α ∷ Γ') ⊢ instantiate-iter t (F z) 0 ∶ τ
+    lem z z∉fv-t z∉Γ' = perm (z ∶ α ∷ Γ) (z ∶ α ∷ Γ') τ (instantiate-iter t (F z) zero) (p-cons (z ∶ α) Γ Γ' permu) 
+                             (y' z z∉fv-t (dom-perm-rev Γ Γ' z permu z∉Γ'))  
+
+  {- BASE perm perm lem-∉-cons sym -}
 
 
   -- context weakening lemma
 
   weak : ∀ (Γ : Context)(τ α : Type)(t : Term)(x : Name) →
-         Γ ⊢ t ∶ α   →    Γ , x ∶ τ ⊢ t ∶ α
-  weak = {!!}
+         Γ ⊢ t ∶ α   →    x ∉ dom Γ → x ∉ fv t → Γ , x ∶ τ ⊢ t ∶ α
+  weak Γ τ α .(F z) x (ass {z} y y') x∉dom x∉fv = ass (ok-cons x Γ τ x∉dom y) (in-drop (x ∶ τ) y')
+  weak Γ τ α .(t $ s) x (app {.Γ} {t} {s} τ₁ .α v1 v2 o d1 d2) x∉dom x∉fv = 
+    app τ₁ α v1 v2 (ok-cons x Γ τ x∉dom o) 
+               (weak Γ τ ((τ₁ ⇒ α)) t x d1 x∉dom (λ x' → x∉fv (lem-∈-extend-r x (fv t) (fv s) x'))) 
+               (weak Γ τ τ₁ s x d2 x∉dom (λ x' → x∉fv (lem-∈-extend-l x (fv s) (fv t) x')))
+  weak Γ τ .(α ⇒ τ') .(ƛ t) x (abs {.Γ} {t} α τ' y y') x∉dom x∉fv = abs α τ' (ok-cons x Γ τ x∉dom y) lem where
+    lem : (z : Name) → (z ∉ fv t) → (z ∉ (x ∷ dom Γ)) → (z ∶ α ∷ x ∶ τ ∷ Γ) ⊢ instantiate-iter t (F z) 0 ∶ τ'
+    lem z z∉fv z∉dom = perm (x ∶ τ ∷ z ∶ α ∷ Γ) ((z ∶ α ∷ x ∶ τ ∷ Γ)) τ' ((instantiate-iter t (F z) 0)) (p-swap (x ∶ τ) (z ∶ α) Γ) 
+                       (weak ((z ∶ α ∷ Γ)) τ τ' ((instantiate-iter t (F z) 0)) x (y' z z∉fv (λ x' → z∉dom (in-drop x x'))) 
+                       (lem-∉-neq-tail x z ((dom Γ)) (λ x' → lem-∉-cons z x (dom Γ) z∉dom (sym x')) x∉dom) 
+                       (lem-instantiate-fresh t x z x∉fv (λ x' → lem-∉-cons z x (dom Γ) z∉dom (sym x'))))
 
 
   -- the progress lemma
