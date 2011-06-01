@@ -1,7 +1,6 @@
 module Data.List.Utils where
 
 open import Data.List
-import Data.List.Theorems as T
 
 open import Data.Empty
 open import Data.Sum
@@ -70,6 +69,13 @@ perm-id : ∀ {A : Set}(l : List A) → Permutation l l
 perm-id [] = p-nil
 perm-id (x ∷ xs) = p-cons x xs xs (perm-id xs)
 
+perm-sym : ∀ {A : Set}(l1 l2 : List A) → Permutation l1 l2 → Permutation l2 l1
+perm-sym .[] .[] p-nil = p-nil
+perm-sym .(x ∷ xs) .(x ∷ xs') (p-cons x xs xs' y) = p-cons x xs' xs (perm-sym xs xs' y)
+perm-sym .(x ∷ y ∷ l) .(y ∷ x ∷ l) (p-swap x y l) = p-swap y x l
+perm-sym l1 l2 (p-trans .l1 l3 .l2 y y') = p-trans l2 l3 l1 (perm-sym l3 l2 y') (perm-sym l1 l3 y)
+
+{- BASE perm perm-id perm-sym -}
 
 perm-in : ∀ {A : Set}(x : A)(l l' : List A) → (cmp : ∀ (a1 a2 : A) → Dec (a1 ≡ a2)) → 
           Permutation l l' →  x ∈ l → x ∈ l'
@@ -108,7 +114,7 @@ perm-swap x y l1 l2 (p-trans .l1 l3 .l2 y' y0) = p-trans (x ∷ y ∷ l1) (y ∷
                                                    (perm-swap x y l1 l3 y')
                                                    (p-cons y (x ∷ l3) (x ∷ l2) (p-cons x l3 l2 y0)) 
 
-{- BASE perm perm-swap perm-id -}
+{- BASE perm perm-swap -}
 
 perm-app : ∀ {A : Set}(xs xs' ys ys' : List A) → Permutation xs xs' → Permutation ys ys' → Permutation (xs ++ ys) (xs' ++ ys')
 perm-app .[] .[] ys ys' p-nil perm-ys' = perm-ys'
