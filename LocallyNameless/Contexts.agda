@@ -3,7 +3,6 @@ module Contexts where
 open import Data.Empty
 open import Data.List
 open import Data.List.Utils
-{- BASE perm perm-in perm-in-rev  lem-∈-app-l lem-∈-app-r perm-in lem-∈-app lem-∈-neq lem-∈-inside lem-∈-extend-l lem-∈-extend-r -}
 
 open import Data.Nat
 open import Data.Nat.Theorems
@@ -16,6 +15,8 @@ open import Relation.Nullary
 
 open import Terms
 open Syntax
+
+{- BASE IMPORT Terms -}
 
 module TypeTechnicalities where
 
@@ -171,7 +172,7 @@ module TypeTechnicalities where
   dom-in (x ∶ τ ∷ xs) .x .τ (in-keep .(x ∶ τ) .xs) = in-keep x (dom xs)
   dom-in (x ∶ τ ∷ xs) z τ' (in-drop .(x ∶ τ) inn) = in-drop x (dom-in xs z τ' inn)
 
-  {- BASE perm dom-inv dom-in -}
+  {- BASE dom dom-inv dom-in -}
 
   dom-perm : ∀ (Γ Γ' : Context)(z : Name) → Permutation Γ Γ' → z ∉ dom Γ → z ∉ dom Γ'
   dom-perm Γ Γ' z perm z∉dom z∈dom' with dom-inv Γ' z z∈dom'
@@ -181,7 +182,9 @@ module TypeTechnicalities where
   dom-perm-rev Γ Γ' z perm z∉dom' z∈dom with dom-inv Γ z z∈dom
   dom-perm-rev Γ Γ' z perm z∉dom' z∈dom | τ ,, inn = z∉dom' (dom-in Γ' z τ (perm-in (z ∶ τ) Γ Γ' ass-dec perm inn))
 
-  {- BASE perm dom-perm dom-perm-rev perm-app -}
+  {- BASE dom dom-perm dom-perm-rev -}
+  {- BASE perm dom-perm dom-perm-rev -}
+
 
   -- permutations and ok
   dom-ok : ∀ (Γ Γ' : Context) → Permutation Γ Γ' → ok Γ → ok Γ'
@@ -200,3 +203,5 @@ module TypeTechnicalities where
    x∉l : x ∉ dom l
    x∉l = λ x0 → y' (in-drop x' x0)  
 
+  {- BASE dom dom-ok -}
+  {- BASE perm dom-ok -}

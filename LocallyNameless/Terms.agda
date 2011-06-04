@@ -12,6 +12,8 @@ open import Relation.Binary hiding (_⇒_)
 open import Relation.Binary.PropositionalEquality
 open import Relation.Nullary
 
+{- BASE IMPORT Data.List.Utils -}
+
 module Syntax where
 
   -- we abstract over names
@@ -185,8 +187,8 @@ module Syntax where
   ==-refl x | yes refl = refl
   ==-refl x | no ¬p = ⊥-elim (¬p refl)
 
-  {- BASE global ⊥-elim cong cong₂ lem-∉-app-l lem-∉-app-r lem-less-means-no lem-≟-refl ==-refl sym -} 
-  {- BASE arith lem-≤-trans lem-≤-suc ≤-pred lem-≤-cases-ext -}
+  {- BASE global lem-∉-app-l lem-∉-app-r lem-less-means-no lem-≟-refl ==-refl sym -} 
+  {- BASE arith lem-less-means-no lem-≤-trans lem-≤-suc ≤-pred lem-≤-cases-ext -}
 
 
   {- the duality between variable opening and closing in two parts -}
@@ -224,9 +226,6 @@ module Syntax where
   lem-close-then-open = lem-close-then-open-iter 0
 
   -- instantiation to a free variable extends the set exactly by it
-
-  {- BASE in lem-∉-app-l lem-∉-app-r lem-∈-app lem-∈-neq lem-∈-inside lem-∈-extend-l lem-∈-extend-r perm-in perm-in-rev -}
-
 
   lem-instantiate-fresh-iter : ∀ (n : ℕ) (t : Term) (x z : Name) → x ∉ fv t → x ≢ z → x ∉ fv (instantiate-iter t (F z) n)
   lem-instantiate-fresh-iter n (B i) x z x∉fv x≢z x∈fv-inst with i ≟ n
@@ -294,7 +293,8 @@ module Syntax where
   lem-subst-alternate : ∀ (t s : Term) (x : Name) → (v : valid t) → t [ x ↦ s ] ≡ instantiate (abstraction x t) s
   lem-subst-alternate = lem-subst-alternate-iter zero
 
-  {- BASE nameless lem-open-then-close lem-close-then-open lem-subst-alternate lem-abstraction-fresh lem-subst-fresh -}
+  {- BASE nameless lem-open-then-close lem-close-then-open lem-instantiate-fresh-iter 
+                   lem-subst-alternate lem-abstraction-fresh lem-subst-fresh -}
 
 {-
   -------------------------------------

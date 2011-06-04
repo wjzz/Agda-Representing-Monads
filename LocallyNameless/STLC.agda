@@ -20,6 +20,7 @@ open Syntax
 open import Contexts
 open TypeTechnicalities
 
+{- BASE IMPORT Contexts -}
 
 module SimplyTyped where
 
@@ -89,9 +90,6 @@ module SimplyTyped where
   -- P xs xs' → P ys ys' → ok (x :: xs ++ ys) → ok (x :: xs' ++ ys')
   -- P xs xs' → P (x : xs) → P (x : ys')
   
-  {- BASE dom dom-ok lem-dom-app-inv-l lem-dom-app-inv-r lem-dom-app-inv lem-dom-not-head lem-ok-app-inv-l lem-ok-app-inv-r -}
-  {- BASE perm lem-∉-cons perm-in perm-in-rev lem-∈-app-l lem-∈-app-r perm-in lem-∈-app lem-∈-neq lem-∈-inside -}
-  {- BASE perm lem-∈-extend-l lem-∈-extend-r ass-dec dom-inv dom-in dom-perm dom-perm-rev perm-app -}
 
   -- context permutation lemma
 
@@ -105,8 +103,8 @@ module SimplyTyped where
     lem z z∉fv-t z∉Γ' = perm (z ∶ α ∷ Γ) (z ∶ α ∷ Γ') τ (instantiate-iter t (F z) zero) (p-cons (z ∶ α) Γ Γ' permu) 
                              (y' z z∉fv-t (dom-perm-rev Γ Γ' z permu z∉Γ'))  
 
-  {- BASE perm perm lem-∉-cons sym -}
-
+  {- BASE perm perm sym -}
+  {- BASE stlc perm -}
 
   -- context weakening lemma
 
@@ -124,6 +122,7 @@ module SimplyTyped where
                        (lem-∉-neq-tail x z ((dom Γ)) (λ x' → lem-∉-cons z x (dom Γ) z∉dom (sym x')) x∉dom) 
                        (lem-instantiate-fresh t x z x∉fv (λ x' → lem-∉-cons z x (dom Γ) z∉dom (sym x'))))
 
+  {- BASE stlc weak -}
 
   -- the progress lemma
 
@@ -136,6 +135,7 @@ module SimplyTyped where
   ... | inj₂ prog-s = inj₂ (ƛ t $ proj₁ prog-s ,, app-a (abs t) (proj₂ prog-s))
   progress .(t $ s) τ val (app {.[]} {t} {s} τ₁ .τ v1 v2 o d1 d2) | inj₂ prog-t = inj₂ (proj₁ prog-t $ s ,, app-f (proj₂ prog-t))
 
+  {- BASE stlc progress -}
 
   -- two lemmas needed to prove lem-subst
 
