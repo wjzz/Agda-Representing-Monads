@@ -7,6 +7,14 @@ open import Data.Sum
 open import Relation.Binary.PropositionalEquality
 open import Relation.Nullary
 
+{- BASE global ⊥-elim cong cong₂ -}
+
+{- 
+----------------------------------------
+   Properties of list membership
+----------------------------------------
+-}
+
 infix 3 _∈_
 
 data _∈_ {A : Set} : (a : A) → (l : List A) → Set where
@@ -16,7 +24,8 @@ data _∈_ {A : Set} : (a : A) → (l : List A) → Set where
 _∉_ : {A : Set} (a : A)(l : List A) → Set
 a ∉ l = ¬ (a ∈ l)
 
-{- BASE global ⊥-elim cong cong₂ -}
+
+-- lemmas for situations where pattern matching doesn't work
 
 lem-∈-eq : ∀ {A : Set} (a a' : A)(xs : List A) → a ≡ a' → a ∈ a' ∷ xs
 lem-∈-eq .a' a' xs refl = in-keep a' xs
@@ -27,6 +36,8 @@ lem-∉-neq-tail a a' xs neq a∉xs (in-drop .a' y) = a∉xs y
 
 lem-∉-cons : ∀ {A : Set} (a a' : A)(xs : List A) → a ∉ (a' ∷ xs) → a ≢ a'
 lem-∉-cons a a' xs x eq rewrite eq = x (in-keep a' xs)
+
+{- BASE in lem-∈-eq lem-∉-neq-tail lem-∉-cons -}
 
 
 -- extension lemmas
@@ -41,12 +52,12 @@ lem-∈-extend-r a .(x ∷ xs) ys (in-drop {.a} {xs} x y) = in-drop x (lem-∈-e
 
 -- ∉ and ++
 
-lem-∈-app-l : ∀ {A : Set} (a : A)(xs ys : List A) → a ∉ (xs ++ ys) → a ∉ xs
-lem-∈-app-l a [] ys p ()
-lem-∈-app-l a (x ∷ xs) ys nin axs = nin (lem-∈-extend-r a (x ∷ xs) ys axs) 
+lem-∉-app-l : ∀ {A : Set} (a : A)(xs ys : List A) → a ∉ (xs ++ ys) → a ∉ xs
+lem-∉-app-l a [] ys p ()
+lem-∉-app-l a (x ∷ xs) ys nin axs = nin (lem-∈-extend-r a (x ∷ xs) ys axs) 
 
-lem-∈-app-r : ∀ {A : Set} (a : A)(xs ys : List A) → a ∉ (xs ++ ys) → a ∉ ys
-lem-∈-app-r a xs ys nin ays = nin (lem-∈-extend-l a ys xs ays)
+lem-∉-app-r : ∀ {A : Set} (a : A)(xs ys : List A) → a ∉ (xs ++ ys) → a ∉ ys
+lem-∉-app-r a xs ys nin ays = nin (lem-∈-extend-l a ys xs ays)
 
 lem-∈-inside : ∀ {A : Set}(a : A) (xs ys : List A) → a ∈ xs ++ (a ∷ ys)
 lem-∈-inside a [] ys = in-keep a ys
@@ -65,9 +76,14 @@ lem-∈-app a (x ∷ xs) ys cmp (in-drop .x y) | no ¬p with lem-∈-app a xs ys
 lem-∈-app a (x ∷ xs) ys cmp (in-drop .x y) | no ¬p | inj₁ l = inj₁ (in-drop x l)
 lem-∈-app a (x ∷ xs) ys cmp (in-drop .x y) | no ¬p | inj₂ r = inj₂ r
 
-{- BASE in lem-∈-app-l lem-∈-app-r lem-∈-app lem-∈-neq lem-∈-inside lem-∈-extend-l lem-∈-extend-r -}
+{- BASE in lem-∉-app-l lem-∉-app-r lem-∈-app lem-∈-neq lem-∈-inside lem-∈-extend-l lem-∈-extend-r -}
 
--- properties of permutations
+
+{-
+----------------------------------------
+      Properties of permutations
+----------------------------------------
+-}
 
 data Permutation {A : Set} : (l1 l2 : List A) → Set where
   p-nil   : Permutation [] []
@@ -110,6 +126,8 @@ perm-in-rev x .(x0 ∷ y ∷ l) .(y ∷ x0 ∷ l) x' (p-swap x0 y l) (in-drop .y
 perm-in-rev x l l' x' (p-trans .l l2 .l' y y') x1 = perm-in-rev x l l2 x' y (perm-in-rev x l2 l' x' y' x1)
 
 {- BASE in perm-in perm-in-rev -}
+{- BASE perm perm-in perm-in-rev -}
+
 
 perm-swap : ∀ {A : Set}(x y : A)(l1 l2 : List A) → Permutation l1 l2 → Permutation (x ∷ y ∷ l1) (y ∷ x ∷ l2)
 perm-swap x y .[] .[] p-nil = p-swap x y []
@@ -135,8 +153,11 @@ perm-nil (x ∷ xs) (p-trans .[] l2 .(x ∷ xs) y y') rewrite (perm-nil l2 y) = 
 postulate
   perm-app : ∀ {A : Set}(xs xs' ys ys' : List A) → Permutation xs xs' → Permutation ys ys' → Permutation (xs ++ ys) (xs' ++ ys')
 
+{- BASE perm perm-app -}
+
 
 {- the following proof typechecks, but may not be terminating -}
+
 {-
 perm-app : ∀ {A : Set}(xs xs' ys ys' : List A) → Permutation xs xs' → Permutation ys ys' → Permutation (xs ++ ys) (xs' ++ ys')
 perm-app .[] .[] ys ys' p-nil perm-ys' = perm-ys'
@@ -151,4 +172,3 @@ perm-app xs xs' ys ys' (p-trans .xs l2 .xs' y y') perm-ys' = p-trans ((xs ++ ys)
   p2 = perm-app l2 xs' ys' ys' y' (perm-id ys')
 -}
 
-{- BASE perm perm-app -}

@@ -185,7 +185,7 @@ module Syntax where
   ==-refl x | yes refl = refl
   ==-refl x | no ¬p = ⊥-elim (¬p refl)
 
-  {- BASE global ⊥-elim cong cong₂ lem-∈-app-l lem-∈-app-r lem-less-means-no lem-≟-refl ==-refl sym -} 
+  {- BASE global ⊥-elim cong cong₂ lem-∉-app-l lem-∉-app-r lem-less-means-no lem-≟-refl ==-refl sym -} 
   {- BASE arith lem-≤-trans lem-≤-suc ≤-pred lem-≤-cases-ext -}
 
 
@@ -198,8 +198,8 @@ module Syntax where
   lem-open-then-close-iter n (F z) x x#t with x == z
   lem-open-then-close-iter n (F z) .z x#t | yes refl = ⊥-elim (x#t (in-keep z []))
   lem-open-then-close-iter n (F z) x x#t | no ¬p = refl
-  lem-open-then-close-iter n (t1 $ t2) x x#t = cong₂ _$_ (lem-open-then-close-iter n t1 x (lem-∈-app-l x (fv t1) (fv t2) x#t)) 
-                                                         (lem-open-then-close-iter n t2 x (lem-∈-app-r x (fv t1) (fv t2) x#t))
+  lem-open-then-close-iter n (t1 $ t2) x x#t = cong₂ _$_ (lem-open-then-close-iter n t1 x (lem-∉-app-l x (fv t1) (fv t2) x#t)) 
+                                                         (lem-open-then-close-iter n t2 x (lem-∉-app-r x (fv t1) (fv t2) x#t))
   lem-open-then-close-iter n (ƛ t) x x#t = cong ƛ (lem-open-then-close-iter (suc n) t x x#t)
 
 
@@ -225,7 +225,7 @@ module Syntax where
 
   -- instantiation to a free variable extends the set exactly by it
 
-  {- BASE in lem-∈-app-l lem-∈-app-r lem-∈-app lem-∈-neq lem-∈-inside lem-∈-extend-l lem-∈-extend-r perm-in perm-in-rev -}
+  {- BASE in lem-∉-app-l lem-∉-app-r lem-∈-app lem-∈-neq lem-∈-inside lem-∈-extend-l lem-∈-extend-r perm-in perm-in-rev -}
 
 
   lem-instantiate-fresh-iter : ∀ (n : ℕ) (t : Term) (x z : Name) → x ∉ fv t → x ≢ z → x ∉ fv (instantiate-iter t (F z) n)
@@ -253,8 +253,8 @@ module Syntax where
   lem-subst-fresh (F z) s x nin with x == z
   lem-subst-fresh (F z) s x nin | yes p rewrite p = ⊥-elim (nin (in-keep z []))
   lem-subst-fresh (F z) s x nin | no ¬p = refl
-  lem-subst-fresh (t1 $ t2) s x nin = cong₂ _$_ (lem-subst-fresh t1 s x (lem-∈-app-l x (fv t1) (fv t2) nin)) 
-                                                (lem-subst-fresh t2 s x (lem-∈-app-r x (fv t1) (fv t2) nin))
+  lem-subst-fresh (t1 $ t2) s x nin = cong₂ _$_ (lem-subst-fresh t1 s x (lem-∉-app-l x (fv t1) (fv t2) nin)) 
+                                                (lem-subst-fresh t2 s x (lem-∉-app-r x (fv t1) (fv t2) nin))
   lem-subst-fresh (ƛ t) s x nin = cong ƛ (lem-subst-fresh t s x nin)
 
 
@@ -266,8 +266,8 @@ module Syntax where
   lem-abstraction-fresh-iter n (F z) x nin | yes p rewrite p = ⊥-elim (nin (in-keep z []))
   lem-abstraction-fresh-iter n (F z) x nin | no ¬p = refl
   lem-abstraction-fresh-iter n (t1 $ t2) x nin = cong₂ _$_
-      (lem-abstraction-fresh-iter n t1 x (lem-∈-app-l x (fv t1) (fv t2) nin))
-      (lem-abstraction-fresh-iter n t2 x (lem-∈-app-r x (fv t1) (fv t2) nin))
+      (lem-abstraction-fresh-iter n t1 x (lem-∉-app-l x (fv t1) (fv t2) nin))
+      (lem-abstraction-fresh-iter n t2 x (lem-∉-app-r x (fv t1) (fv t2) nin))
   lem-abstraction-fresh-iter n (ƛ t) x nin = cong ƛ (lem-abstraction-fresh-iter (suc n) t x nin)
  
 
