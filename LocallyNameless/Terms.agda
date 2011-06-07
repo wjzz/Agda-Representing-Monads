@@ -256,6 +256,24 @@ module Syntax where
                                                 (lem-subst-fresh t2 s x (lem-∉-app-r x (fv t1) (fv t2) nin))
   lem-subst-fresh (ƛ t) s x nin = cong ƛ (lem-subst-fresh t s x nin)
 
+  -- substition can introduce new free variables
+
+  lem-subst-free-in : ∀ (t s : Term)(x z : Name) → x ∈ fv t → z ∈ fv s → z ∈ fv (t [ x ↦ s ]) 
+  lem-subst-free-in (B i) s x z () z∈s
+  lem-subst-free-in (F z) s x z' z∈t z∈s with inspect (x == z)
+  lem-subst-free-in (F z) s x z' z∈t z∈s | yes p with-≡ eq rewrite p | eq = z∈s
+  lem-subst-free-in (F z) s .z z' (in-keep .z .[]) z∈s | no ¬p with-≡ eq = ⊥-elim (¬p refl)
+  lem-subst-free-in (F z) s x z' (in-drop .z ()) z∈s | no ¬p with-≡ eq
+  lem-subst-free-in (t1 $ t2) s x z x∈t z∈s with lem-∈-app x (fv t1) (fv t2) _==_ x∈t
+  lem-subst-free-in (t1 $ t2) s x z x∈t z∈s | inj₁ x' = 
+    lem-∈-extend-r z (fv (t1 [ x ↦ s ])) (fv (t2 [ x ↦ s ])) (lem-subst-free-in t1 s x z x' z∈s)
+  lem-subst-free-in (t1 $ t2) s x z x∈t z∈s | inj₂ y = 
+    lem-∈-extend-l z (fv (t2 [ x ↦ s ])) (fv (t1 [ x ↦ s ])) (lem-subst-free-in t2 s x z y z∈s)
+  lem-subst-free-in (ƛ t) s x z z∈t z∈s = lem-subst-free-in t s x z z∈t z∈s
+
+  lem-subst-free : ∀ (t s : Term)(x z : Name) → x ∈ fv t → z ∉ fv (t [ x ↦ s ]) → z ∉ fv s
+  lem-subst-free t s x z x' x0 x1 = x0 (lem-subst-free-in t s x z x' x1)
+
 
   -- abstraction on a fresh variable is an identity
 
