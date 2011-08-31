@@ -1,0 +1,1 @@
+A formalization of Simply Typed Lambda Calculus that uses dependently typed de Bruijin indices, locally nameless and cofinite quantification.
